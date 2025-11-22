@@ -2,50 +2,64 @@ package pl.bak.home_energy_controller.db.model;
 
 import jakarta.persistence.*;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
+import java.time.Instant;
 
 @Entity
-@Table(name = "device")
+@Table(name = "devices",
+        indexes = @Index(name = "idx_devices_tuya_id", columnList = "tuya_id", unique = true))
 public class Device {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
+    @Column(name = "tuya_id", nullable = false, unique = true)
+    private String tuyaId;          // id z Tuya
+
+    @Column(name = "name")
     private String name;
-    private String category;
+
+    @Column(name = "category")
+    private String category;        // "cz", "dj", "qt", ...
+
+    @Column(name = "model")
     private String model;
-    private boolean online;
 
-    private Double currentPower;   // W
-    private Double currentCurrent; // A
-    private Double currentVoltage; // V
-    private Double totalEnergy;    // kWh
+    @Column(name = "ip")
+    private String ip;
 
-    private LocalDateTime lastUpdated;
+    @Column(name = "online")
+    private Boolean online;
 
-    public Device() {
-    }
+    @Column(name = "last_power_w")
+    private Double lastPowerW;
 
-    public Device(String id, String name, String category, String model, boolean online, Double currentPower, Double currentCurrent, Double currentVoltage, Double totalEnergy, LocalDateTime lastUpdated) {
-        this.id = id;
-        this.name = name;
-        this.category = category;
-        this.model = model;
-        this.online = online;
-        this.currentPower = currentPower;
-        this.currentCurrent = currentCurrent;
-        this.currentVoltage = currentVoltage;
-        this.totalEnergy = totalEnergy;
-        this.lastUpdated = lastUpdated;
-    }
+    @Column(name = "last_voltage_v")
+    private Double lastVoltageV;
 
-    public String getId() {
+    @Column(name = "last_current_ma")
+    private Integer lastCurrentMa;
+
+    @Column(name = "last_energy_kwh")
+    private Double lastEnergyKwh;
+
+    @Column(name = "last_update")
+    private Instant lastUpdate;
+
+    public Long getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getTuyaId() {
+        return tuyaId;
+    }
+
+    public void setTuyaId(String tuyaId) {
+        this.tuyaId = tuyaId;
     }
 
     public String getName() {
@@ -72,51 +86,59 @@ public class Device {
         this.model = model;
     }
 
-    public boolean isOnline() {
+    public String getIp() {
+        return ip;
+    }
+
+    public void setIp(String ip) {
+        this.ip = ip;
+    }
+
+    public Boolean getOnline() {
         return online;
     }
 
-    public void setOnline(boolean online) {
+    public void setOnline(Boolean online) {
         this.online = online;
     }
 
-    public Double getCurrentPower() {
-        return currentPower;
+    public Double getLastPowerW() {
+        return lastPowerW;
     }
 
-    public void setCurrentPower(Double currentPower) {
-        this.currentPower = currentPower;
+    public void setLastPowerW(Double lastPowerW) {
+        this.lastPowerW = lastPowerW;
     }
 
-    public Double getCurrentCurrent() {
-        return currentCurrent;
+    public Double getLastVoltageV() {
+        return lastVoltageV;
     }
 
-    public void setCurrentCurrent(Double currentCurrent) {
-        this.currentCurrent = currentCurrent;
+    public void setLastVoltageV(Double lastVoltageV) {
+        this.lastVoltageV = lastVoltageV;
     }
 
-    public Double getCurrentVoltage() {
-        return currentVoltage;
+    public Integer getLastCurrentMa() {
+        return lastCurrentMa;
     }
 
-    public void setCurrentVoltage(Double currentVoltage) {
-        this.currentVoltage = currentVoltage;
+    public void setLastCurrentMa(Integer lastCurrentMa) {
+        this.lastCurrentMa = lastCurrentMa;
     }
 
-    public Double getTotalEnergy() {
-        return totalEnergy;
+    public Double getLastEnergyKwh() {
+        return lastEnergyKwh;
     }
 
-    public void setTotalEnergy(Double totalEnergy) {
-        this.totalEnergy = totalEnergy;
+    public void setLastEnergyKwh(Double lastEnergyKwh) {
+        this.lastEnergyKwh = lastEnergyKwh;
     }
 
-    public LocalDateTime getLastUpdated() {
-        return lastUpdated;
+    public Instant getLastUpdate() {
+        return lastUpdate;
     }
 
-    public void setLastUpdated(LocalDateTime lastUpdated) {
-        this.lastUpdated = lastUpdated;
+    public void setLastUpdate(Instant lastUpdate) {
+        this.lastUpdate = lastUpdate;
     }
 }
