@@ -7,6 +7,8 @@ import pl.bak.home_energy_controller.db.dao.DeviceRepository;
 import pl.bak.home_energy_controller.db.model.DeviceEntity;
 import pl.bak.home_energy_controller.db.service.TuyaEnergyService;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -35,30 +37,46 @@ public class TuyaScheduler {
     @Scheduled(initialDelay = 10000, fixedRate = 60000)
     public void pollDevices() {
         try {
-//            var devices = deviceRepository.findAll(); // lub getDevices() z Tuya
-//            for (DeviceEntity d : devices) {
-                Map<String, Object> statusMap = client.getDeviceStatus("bf8c4e2875cad60e33pqjw");
-            System.out.println(statusMap);
-            tuyaEnergyService.saveDeviceStatus(
-                    "bf8c4e2875cad60e33pqjw",
-                    "zasilanie_komputera",
-                    "cz",
-                    "P021HWA",
-                    true,
-                    statusMap
-            );
-//                tuyaEnergyService.processDeviceStatus(
-//                        d.getId(),
-//                        d.getName(),
-//                        d.getCategory(),
-//                        d.getModel(),
-//                        d.isOnline(),
-//                        statusMap
-//                );
-//            }
+            client.login();
+            List<Map<String, Object>> devices = client.getAllDevices();
+
+            if (devices == null || devices.isEmpty()) {
+                System.err.println("⚠️ No devices fetched from Tuya.");
+                return;
+            }
+
+            System.out.println("📡 Found " + devices.size() + " devices");
+
+            for (Map<String, Object> deviceData : devices) {
+                String category = (String) deviceData.get("category");
+
+                saveDeviceToDb(deviceData);
+            }
+
+            System.out.println("✅ Devices saved to database");
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void saveDeviceToDb(Map<String, Object> data) {
+        data.forEach((s, o) -> System.out.println(s + ": " + o));
+        String id = (String) data.get("id");
+        String name = (String) data.get("name");
+        String category = (String) data.get("category");
+        String model = (String) data.get("model");
+        boolean online = (Boolean) data.get("online");
+
+        DeviceEntity device = deviceRepository.findById(id).orElse(new DeviceEntity());
+        device.setId(id);
+        device.setName(name);
+        device.setCategory(category);
+        device.setModel(model);
+        device.setOnline(online);
+        device.setLastUpdated(LocalDateTime.now());
+
+        deviceRepository.save(device);
+        System.out.println("💾 Saved device: " + name + " (" + id + ")");
     }
 }
 

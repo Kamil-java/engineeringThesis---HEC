@@ -8,6 +8,7 @@ import org.springframework.web.client.RestTemplate;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -53,6 +54,38 @@ public class TuyaClient {
         } else {
             throw new RuntimeException("❌ Tuya login failed: " + json);
         }
+    }
+
+    public List<Map<String, Object>> getAllDevices() throws Exception {
+        String path = "/v1.0/users/" + config.getUserUid() + "/devices";
+        String url = config.getEndpoint() + path;
+        HttpHeaders headers = createSignedHeaders("GET", path);
+        HttpEntity<String> entity = new HttpEntity<>("", headers);
+
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+
+        JSONObject json = new JSONObject(response.getBody());
+
+        if (!json.optBoolean("success", false)) {
+            System.err.println("❌ Tuya API error: " + json);
+            return Collections.emptyList();
+        }
+
+        JSONArray result = json.optJSONArray("result");
+        if (result == null) {
+            System.err.println("⚠️ No 'result' field found in response: " + json);
+            return Collections.emptyList();
+        }
+
+        // Zamiana JSONArray → List<Map<String,Object>>
+        List<Map<String, Object>> devices = new ArrayList<>();
+        for (int i = 0; i < result.length(); i++) {
+            JSONObject obj = result.getJSONObject(i);
+            devices.add(obj.toMap());
+        }
+
+        System.out.println("[📡] Devices fetched: " + devices.size());
+        return devices;
     }
 
     /**
