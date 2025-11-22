@@ -1,5 +1,6 @@
 package  pl.bak.home_energy_controller.tuya;
 
+import jakarta.annotation.PostConstruct;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.http.*;
@@ -23,7 +24,7 @@ public class TuyaClient {
         this.config = config;
     }
 
-    /** Login and token retrieval */
+    @PostConstruct
     public void login() throws Exception {
         long t = System.currentTimeMillis();
         String nonce = UUID.randomUUID().toString();
@@ -77,7 +78,6 @@ public class TuyaClient {
             return Collections.emptyList();
         }
 
-        // Zamiana JSONArray → List<Map<String,Object>>
         List<Map<String, Object>> devices = new ArrayList<>();
         for (int i = 0; i < result.length(); i++) {
             JSONObject obj = result.getJSONObject(i);
@@ -182,7 +182,6 @@ public class TuyaClient {
         return statusMap;
     }
 
-    /** Create signed headers for Tuya OpenAPI */
     private HttpHeaders createSignedHeaders(String method, String path) throws Exception {
         long t = System.currentTimeMillis();
         String nonce = UUID.randomUUID().toString();
@@ -205,7 +204,6 @@ public class TuyaClient {
         return headers;
     }
 
-    /** Metoda pomocnicza do HMAC-SHA256 w HEX uppercase */
     private String hmacSHA256(String data, String key) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
         SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
