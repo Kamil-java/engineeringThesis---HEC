@@ -46,6 +46,29 @@ public class Device {
     @Column(name = "last_update")
     private Instant lastUpdate;
 
+    @Column(name = "last_switch_on")
+    private Boolean lastSwitchOn;
+
+    // od kiedy jest włączona (jeśli lastSwitchOn = true)
+    @Column(name = "last_switch_on_since")
+    private Instant lastSwitchOnSince;
+
+    public Boolean getLastSwitchOn() {
+        return lastSwitchOn;
+    }
+
+    public void setLastSwitchOn(Boolean lastSwitchOn) {
+        this.lastSwitchOn = lastSwitchOn;
+    }
+
+    public Instant getLastSwitchOnSince() {
+        return lastSwitchOnSince;
+    }
+
+    public void setLastSwitchOnSince(Instant lastSwitchOnSince) {
+        this.lastSwitchOnSince = lastSwitchOnSince;
+    }
+
     public Long getId() {
         return id;
     }
