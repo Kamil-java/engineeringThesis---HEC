@@ -53,6 +53,30 @@ public class Device {
     @Column(name = "last_switch_on_since")
     private Instant lastSwitchOnSince;
 
+    @Column(name = "rated_power_w")
+    private Double ratedPowerW;   // moc znamionowa żarówki w W
+
+    @Column(name = "bulb_description")
+    private String bulbDescription; // np. "Philips GU10 5.5W 400lm"
+
+// gettery / settery
+
+    public Double getRatedPowerW() {
+        return ratedPowerW;
+    }
+
+    public void setRatedPowerW(Double ratedPowerW) {
+        this.ratedPowerW = ratedPowerW;
+    }
+
+    public String getBulbDescription() {
+        return bulbDescription;
+    }
+
+    public void setBulbDescription(String bulbDescription) {
+        this.bulbDescription = bulbDescription;
+    }
+
     public Boolean getLastSwitchOn() {
         return lastSwitchOn;
     }
