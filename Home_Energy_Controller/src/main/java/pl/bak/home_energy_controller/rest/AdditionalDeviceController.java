@@ -94,6 +94,8 @@ public class AdditionalDeviceController {
         dto.setCategory(entity.getCategory());
         dto.setRatedPowerW(entity.getRatedPowerW());
         dto.setDescription(entity.getDescription());
+        dto.setCreatedAt(entity.getCreatedAt());
+        dto.setUpdatedAt(entity.getUpdatedAt());
         return dto;
     }
 }

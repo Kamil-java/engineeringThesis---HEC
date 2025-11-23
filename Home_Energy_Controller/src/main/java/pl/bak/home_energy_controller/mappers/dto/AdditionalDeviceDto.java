@@ -1,5 +1,7 @@
 package pl.bak.home_energy_controller.mappers.dto;
 
+import java.time.Instant;
+
 public class AdditionalDeviceDto {
 
     private Long id;
@@ -7,6 +9,9 @@ public class AdditionalDeviceDto {
     private String category;
     private Double ratedPowerW;
     private String description;
+    private Instant createdAt;
+    private Instant updatedAt;
+
 
     public AdditionalDeviceDto() {
     }
@@ -49,5 +54,21 @@ public class AdditionalDeviceDto {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

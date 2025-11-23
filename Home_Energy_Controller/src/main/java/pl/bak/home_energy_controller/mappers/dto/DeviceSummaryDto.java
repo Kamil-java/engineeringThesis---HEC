@@ -1,5 +1,7 @@
 package pl.bak.home_energy_controller.mappers.dto;
 
+import java.time.Instant;
+
 public class DeviceSummaryDto {
 
     /**
@@ -15,6 +17,10 @@ public class DeviceSummaryDto {
 
     private String name;
     private String category;
+    private String model;
+    private String ip;
+    private Instant lastUpdate;
+
 
     /**
      * online/offline tylko dla urządzeń z Tuya,
@@ -90,5 +96,29 @@ public class DeviceSummaryDto {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
+    }
+
+    public String getIp() {
+        return ip;
+    }
+
+    public void setIp(String ip) {
+        this.ip = ip;
+    }
+
+    public Instant getLastUpdate() {
+        return lastUpdate;
+    }
+
+    public void setLastUpdate(Instant lastUpdate) {
+        this.lastUpdate = lastUpdate;
     }
 }

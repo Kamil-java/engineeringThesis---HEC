@@ -38,6 +38,9 @@ public class DeviceController {
             dto.setOnline(d.getOnline());
             dto.setRatedPowerW(d.getRatedPowerW());
             dto.setDescription(d.getBulbDescription());
+            dto.setModel(d.getModel());
+            dto.setIp(d.getIp());
+            dto.setLastUpdate(d.getLastUpdate());
             result.add(dto);
         }
 
