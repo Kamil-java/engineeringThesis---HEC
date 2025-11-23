@@ -6,10 +6,10 @@ import org.json.JSONObject;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import pl.bak.home_energy_controller.config.TuyaConfig;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -88,11 +88,6 @@ public class TuyaClient {
         return devices;
     }
 
-    /**
-     * Get all devices linked to user UID
-     *
-     * @return
-     */
     public List<Map<String, Object>> getDevices() throws Exception {
         if (accessToken == null) throw new IllegalStateException("You must login first");
 
@@ -107,7 +102,6 @@ public class TuyaClient {
         return null;
     }
 
-    /** Get general device information (name, category, etc.) */
     public JSONObject getDeviceDetails(String deviceId) throws Exception {
         if (accessToken == null) throw new IllegalStateException("You must login first");
 
@@ -127,7 +121,6 @@ public class TuyaClient {
         return json.getJSONObject("result");
     }
 
-    /** Get device power/energy status (cur_power, cur_voltage, add_ele, etc.) */
     public Map<String, Object> getDeviceStatus(String deviceId) throws Exception {
         if (accessToken == null) {
             throw new IllegalStateException("Not logged in – missing access token");
@@ -164,20 +157,15 @@ public class TuyaClient {
             throw new RuntimeException("❌ Failed to get device status: " + body);
         }
 
-        // ✅ result to tablica (JSONArray), nie obiekt
         JSONArray resultArray = json.getJSONArray("result");
         Map<String, Object> statusMap = new HashMap<>();
 
-        // Konwersja JSONArray → Map<String, Object>
         for (int i = 0; i < resultArray.length(); i++) {
             JSONObject item = resultArray.getJSONObject(i);
             String code = item.getString("code");
             Object value = item.get("value");
             statusMap.put(code, value);
         }
-
-        // 🔍 opcjonalnie: log
-        System.out.println("✅ [" + deviceId + "] Status fetched: " + statusMap);
 
         return statusMap;
     }

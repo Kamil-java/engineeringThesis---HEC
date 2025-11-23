@@ -1,4 +1,4 @@
-package pl.bak.home_energy_controller.mappers;
+package pl.bak.home_energy_controller.tuya;
 
 import org.springframework.stereotype.Service;
 
@@ -22,11 +22,10 @@ public class TuyaStatusParser {
                 if (value == null) continue;
 
                 switch (code) {
-                    // energia (głównie "cz")
-                    case "add_ele": pv.energyKwh = toInt(value) / 1000.0; // scale 3
-                    case "cur_power": pv.powerW = toInt(value) / 10.0;    // scale 1
-                    case "cur_voltage": pv.voltageV = toInt(value) / 10.0;// scale 1
-                    case "cur_current": pv.currentMa = toInt(value);      // mA
+                    case "add_ele": pv.energyKwh = toInt(value) / 1000.0;
+                    case "cur_power": pv.powerW = toInt(value) / 10.0;
+                    case "cur_voltage": pv.voltageV = toInt(value) / 10.0;
+                    case "cur_current": pv.currentMa = toInt(value);
                     case "switch":
                     case "switch_1":
                     case "switch_led":
@@ -54,8 +53,6 @@ public class TuyaStatusParser {
         public Double powerW;
         public Double voltageV;
         public Integer currentMa;
-
-        // dla lampek / przełączników
         public Boolean switchOn;
     }
 }

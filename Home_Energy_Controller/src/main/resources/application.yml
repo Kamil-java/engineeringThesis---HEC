@@ -1,6 +1,6 @@
 hec:
   tariffs:
-    defaultRatePerKwh: 0.85
+    defaultRatePerKwh: 1.07
     categories:
-      cz: 0.85
+      cz: 1.07
       dj: 0.90

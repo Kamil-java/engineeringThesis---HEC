@@ -1,4 +1,4 @@
-package pl.bak.home_energy_controller.db.model;
+package pl.bak.home_energy_controller.domain.model;
 
 import jakarta.persistence.*;
 
@@ -15,7 +15,6 @@ public class LightingUsage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // powiązanie z Device (stanem bieżącym)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "device_id", nullable = false)
     private Device device;
@@ -26,7 +25,6 @@ public class LightingUsage {
     @Column(name = "end_time", nullable = false)
     private Instant endTime;
 
-    // dla wygody – ile świeciło w sekundach
     @Column(name = "duration_seconds", nullable = false)
     private Long durationSeconds;
 

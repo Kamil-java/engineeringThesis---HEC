@@ -1,7 +1,7 @@
 package pl.bak.home_energy_controller.rest;
 
 import org.springframework.web.bind.annotation.*;
-import pl.bak.home_energy_controller.tariff.EnergyCostService;
+import pl.bak.home_energy_controller.billing.EnergyCostService;
 
 import java.math.BigDecimal;
 import java.time.YearMonth;
@@ -25,7 +25,6 @@ public class EnergyCostController {
             @PathVariable Long deviceId,
             @RequestParam(name = "hours", defaultValue = "5") double hours
     ) {
-        // używam tej samej strefy co wcześniej
         return energyCostService.estimateCostForDeviceOverHours(
                 deviceId,
                 hours,
@@ -33,11 +32,6 @@ public class EnergyCostController {
         );
     }
 
-    /**
-     * Ile JUŻ nabiło na konkretnym urządzeniu w bieżącym miesiącu.
-     *
-     * GET /api/costs/device/5/current-month
-     */
     @GetMapping("/device/{deviceId}/current-month")
     public Map<String, Object> getCurrentMonthDeviceCost(@PathVariable Long deviceId) {
         YearMonth ym = YearMonth.now(zoneId);
@@ -57,11 +51,27 @@ public class EnergyCostController {
         return response;
     }
 
-    /**
-     * Ile JUŻ nabiło w bieżącym miesiącu per kategoria + suma.
-     *
-     * GET /api/costs/current-month/summary
-     */
+    @GetMapping("/additional-device/{deviceId}/estimate")
+    public Map<String, Object> estimateAdditionalDevice(
+            @PathVariable Long deviceId,
+            @RequestParam(name = "hours", required = false) Double hours,
+            @RequestParam(name = "days", required = false) Integer days,
+            @RequestParam(name = "avgHoursPerDay", required = false) Double avgHoursPerDay
+    ) {
+        if (hours == null && (days == null || avgHoursPerDay == null)) {
+            throw new IllegalArgumentException(
+                    "You must provide either 'hours' OR 'days' and 'avgHoursPerDay'."
+            );
+        }
+
+        return energyCostService.estimateAdditionalDeviceEnergyAndCost(
+                deviceId,
+                hours,
+                days,
+                avgHoursPerDay
+        );
+    }
+
     @GetMapping("/current-month/summary")
     public Map<String, Object> getCurrentMonthSummary() {
         YearMonth ym = YearMonth.now(zoneId);

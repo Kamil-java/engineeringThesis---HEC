@@ -1,4 +1,4 @@
-package pl.bak.home_energy_controller.db.model;
+package pl.bak.home_energy_controller.domain.model;
 
 import jakarta.persistence.*;
 
@@ -23,16 +23,16 @@ public class EnergyMeasurement {
     private Instant measuredAt;
 
     @Column(name = "energy_kwh")
-    private Double energyKwh;      // add_ele (po przeliczeniu)
+    private Double energyKwh;
 
     @Column(name = "power_w")
-    private Double powerW;         // cur_power
+    private Double powerW;
 
     @Column(name = "voltage_v")
-    private Double voltageV;       // cur_voltage
+    private Double voltageV;
 
     @Column(name = "current_ma")
-    private Integer currentMa;     // cur_current
+    private Integer currentMa;
 
     public Long getId() {
         return id;

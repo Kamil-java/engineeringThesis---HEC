@@ -1,13 +1,16 @@
-package pl.bak.home_energy_controller.tariff;
+package pl.bak.home_energy_controller.billing;
 
-import pl.bak.home_energy_controller.db.dao.DeviceRepository;
-import pl.bak.home_energy_controller.db.dao.EnergyMeasurementRepository;
-import pl.bak.home_energy_controller.db.dao.LightingUsageRepository;
-import pl.bak.home_energy_controller.db.model.Device;
-import pl.bak.home_energy_controller.db.model.EnergyMeasurement;
+import pl.bak.home_energy_controller.config.TariffProperties;
+import pl.bak.home_energy_controller.domain.dao.AdditionalDeviceRepository;
+import pl.bak.home_energy_controller.domain.dao.DeviceRepository;
+import pl.bak.home_energy_controller.domain.dao.EnergyMeasurementRepository;
+import pl.bak.home_energy_controller.domain.dao.LightingUsageRepository;
+import pl.bak.home_energy_controller.domain.model.AdditionalDevice;
+import pl.bak.home_energy_controller.domain.model.Device;
+import pl.bak.home_energy_controller.domain.model.EnergyMeasurement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import pl.bak.home_energy_controller.db.model.LightingUsage;
+import pl.bak.home_energy_controller.domain.model.LightingUsage;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -22,15 +25,19 @@ public class EnergyCostService {
     private final DeviceRepository deviceRepository;
     private final TariffProperties tariffProperties;
     private final LightingUsageRepository lightingUsageRepository;
+    private final AdditionalDeviceRepository additionalDeviceRepository;
 
-    @Autowired
+
     public EnergyCostService(EnergyMeasurementRepository energyMeasurementRepository,
                              DeviceRepository deviceRepository,
-                             TariffProperties tariffProperties, LightingUsageRepository lightingUsageRepository) {
+                             LightingUsageRepository lightingUsageRepository,
+                             AdditionalDeviceRepository additionalDeviceRepository,
+                             TariffProperties tariffProperties) {
         this.energyMeasurementRepository = energyMeasurementRepository;
         this.deviceRepository = deviceRepository;
-        this.tariffProperties = tariffProperties;
         this.lightingUsageRepository = lightingUsageRepository;
+        this.additionalDeviceRepository = additionalDeviceRepository;
+        this.tariffProperties = tariffProperties;
     }
 
     public Map<String, Object> estimateCostForDeviceOverHours(Long deviceId, double hours, ZoneId zoneId) {
@@ -41,12 +48,10 @@ public class EnergyCostService {
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new IllegalArgumentException("Device not found: " + deviceId));
 
-        // ostatni pomiar z tabeli energy_measurements
         Optional<EnergyMeasurement> opt = energyMeasurementRepository
                 .findTopByDeviceOrderByMeasuredAtDesc(device);
 
         if (opt.isEmpty() || opt.get().getPowerW() == null) {
-            // nie mamy danych o mocy – nie umiemy estymować
             Map<String, Object> resp = new HashMap<>();
             resp.put("deviceId", deviceId);
             resp.put("hours", hours);
@@ -57,19 +62,15 @@ public class EnergyCostService {
         }
 
         EnergyMeasurement last = opt.get();
-        Double powerW = last.getPowerW();  // np. 150.0 W
+        Double powerW = last.getPowerW();
         BigDecimal rate = tariffProperties.getRateForCategory(device.getCategory());
 
-        // moc w kW
         BigDecimal powerKw = BigDecimal.valueOf(powerW / 1000.0);
 
-        // energia = P[kW] * t[h]
         BigDecimal energyKwh = powerKw.multiply(BigDecimal.valueOf(hours));
 
-        // koszt = energia * stawka
         BigDecimal cost = energyKwh.multiply(rate).setScale(2, RoundingMode.HALF_UP);
 
-        // prosty JSON-like wynik
         Map<String, Object> resp = new HashMap<>();
         resp.put("deviceId", deviceId);
         resp.put("hours", hours);
@@ -94,7 +95,6 @@ public class EnergyCostService {
                 .orElseThrow(() -> new IllegalArgumentException("Device not found: " + deviceId));
 
         if (device.getRatedPowerW() == null) {
-            // brak danych o mocy – nie umiemy policzyć
             return BigDecimal.ZERO;
         }
 
@@ -118,9 +118,6 @@ public class EnergyCostService {
         return BigDecimal.valueOf(kwh);
     }
 
-    /**
-     * Koszt energii lampki w danym miesiącu, liczony z ratedPowerW i lighting_usage.
-     */
     public BigDecimal calculateLightingCostForDevice(Long deviceId, YearMonth month, ZoneId zoneId) {
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new IllegalArgumentException("Device not found: " + deviceId));
@@ -138,10 +135,6 @@ public class EnergyCostService {
         return cost;
     }
 
-    /**
-     * Zużycie energii (kWh) dla konkretnego urządzenia w zadanym miesiącu.
-     * Liczymy sumę dodatnich przyrostów energy_kwh (add_ele) w miesiącu.
-     */
     public BigDecimal calculateMonthlyEnergyKwhForDevice(Long deviceId, YearMonth month, ZoneId zoneId) {
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new IllegalArgumentException("Device not found: " + deviceId));
@@ -166,7 +159,6 @@ public class EnergyCostService {
             return BigDecimal.ZERO;
         }
 
-        // Dla debugowania: pokaż pierwsze kilka rekordów
         list.stream()
                 .limit(5)
                 .forEach(m -> System.out.printf(
@@ -186,7 +178,6 @@ public class EnergyCostService {
             if (last != null) {
                 double diff = e - last;
 
-                // tylko dodatnie sensowne przyrosty
                 if (diff > 0.0 && diff < 1000.0) {
                     totalKwh += diff;
                 }
@@ -202,9 +193,6 @@ public class EnergyCostService {
         return BigDecimal.valueOf(totalKwh);
     }
 
-    /**
-     * Koszt energii (PLN) dla konkretnego urządzenia w zadanym miesiącu.
-     */
     public BigDecimal calculateMonthlyCostForDevice(Long deviceId, YearMonth month, ZoneId zoneId) {
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new IllegalArgumentException("Device not found: " + deviceId));
@@ -222,9 +210,6 @@ public class EnergyCostService {
         return cost;
     }
 
-    /**
-     * Koszt dla całej kategorii (np. "cz") w danym miesiącu.
-     */
     public BigDecimal calculateMonthlyCostForCategory(String category, YearMonth month, ZoneId zoneId) {
         List<Device> devices = deviceRepository.findAll().stream()
                 .filter(d -> category.equals(d.getCategory()))
@@ -233,30 +218,15 @@ public class EnergyCostService {
         BigDecimal total = BigDecimal.ZERO;
         BigDecimal rate = tariffProperties.getRateForCategory(category);
 
-        System.out.printf(
-                "[COST] category=%s, devices=%d, rate=%s%n",
-                category, devices.size(), rate.toPlainString()
-        );
-
         for (Device device : devices) {
             BigDecimal energyKwh = calculateMonthlyEnergyKwhForDevice(device.getId(), month, zoneId);
             BigDecimal cost = energyKwh.multiply(rate);
             total = total.add(cost);
         }
 
-        BigDecimal result = total.setScale(2, RoundingMode.HALF_UP);
-
-        System.out.printf(
-                "[COST] category=%s, month=%s, totalCost=%s%n",
-                category, month, result.toPlainString()
-        );
-
-        return result;
+        return total.setScale(2, RoundingMode.HALF_UP);
     }
 
-    /**
-     * Koszt per kategoria (dla wszystkich kategorii obecnych w devices).
-     */
     public Map<String, BigDecimal> calculateMonthlyCostPerCategory(YearMonth month, ZoneId zoneId) {
         List<Device> devices = deviceRepository.findAll();
 
@@ -294,5 +264,57 @@ public class EnergyCostService {
         }
 
         return result;
+    }
+
+    public Map<String, Object> estimateAdditionalDeviceEnergyAndCost(
+            Long additionalDeviceId,
+            Double hours,
+            Integer days,
+            Double avgHoursPerDay
+    ) {
+        if (hours == null && (days == null || avgHoursPerDay == null)) {
+            throw new IllegalArgumentException("Provide either 'hours' OR ('days' and 'avgHoursPerDay').");
+        }
+
+        AdditionalDevice device = additionalDeviceRepository.findById(additionalDeviceId)
+                .orElseThrow(() -> new IllegalArgumentException("Additional device not found: " + additionalDeviceId));
+
+        if (device.getRatedPowerW() == null) {
+            // nie znamy mocy -> nie umiemy policzyć
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("deviceId", additionalDeviceId);
+            resp.put("error", "ratedPowerW is not set for this device");
+            return resp;
+        }
+
+        double totalHours;
+        String mode;
+
+        if (hours != null) {
+            totalHours = hours;
+            mode = "HOURS";
+        } else {
+            totalHours = days * avgHoursPerDay;
+            mode = "DAYS_AVG_PER_DAY";
+        }
+
+        // moc w kW
+        double powerKw = device.getRatedPowerW() / 1000.0;
+        BigDecimal energyKwh = BigDecimal.valueOf(powerKw * totalHours);
+
+        // stawka po kategorii (jak dla reszty)
+        BigDecimal rate = tariffProperties.getRateForCategory(device.getCategory());
+        BigDecimal cost = energyKwh.multiply(rate).setScale(2, RoundingMode.HALF_UP);
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("deviceId", additionalDeviceId);
+        resp.put("mode", mode);
+        resp.put("hours", totalHours);
+        resp.put("ratedPowerW", device.getRatedPowerW());
+        resp.put("energyKwh", energyKwh);
+        resp.put("ratePerKwh", rate);
+        resp.put("cost", cost);
+
+        return resp;
     }
 }

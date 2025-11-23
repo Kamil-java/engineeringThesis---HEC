@@ -1,4 +1,4 @@
-package pl.bak.home_energy_controller.tariff;
+package pl.bak.home_energy_controller.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;

@@ -1,4 +1,4 @@
-package pl.bak.home_energy_controller.db.model;
+package pl.bak.home_energy_controller.domain.model;
 
 import jakarta.persistence.*;
 
@@ -14,13 +14,13 @@ public class Device {
     private Long id;
 
     @Column(name = "tuya_id", nullable = false, unique = true)
-    private String tuyaId;          // id z Tuya
+    private String tuyaId;
 
     @Column(name = "name")
     private String name;
 
     @Column(name = "category")
-    private String category;        // "cz", "dj", "qt", ...
+    private String category;
 
     @Column(name = "model")
     private String model;
@@ -49,17 +49,14 @@ public class Device {
     @Column(name = "last_switch_on")
     private Boolean lastSwitchOn;
 
-    // od kiedy jest włączona (jeśli lastSwitchOn = true)
     @Column(name = "last_switch_on_since")
     private Instant lastSwitchOnSince;
 
     @Column(name = "rated_power_w")
-    private Double ratedPowerW;   // moc znamionowa żarówki w W
+    private Double ratedPowerW;
 
     @Column(name = "bulb_description")
-    private String bulbDescription; // np. "Philips GU10 5.5W 400lm"
-
-// gettery / settery
+    private String bulbDescription;
 
     public Double getRatedPowerW() {
         return ratedPowerW;

@@ -1,10 +1,15 @@
 package pl.bak.home_energy_controller.rest;
 
 import org.springframework.web.bind.annotation.*;
-import pl.bak.home_energy_controller.db.dao.DeviceRepository;
-import pl.bak.home_energy_controller.db.model.Device;
+import pl.bak.home_energy_controller.domain.dao.AdditionalDeviceRepository;
+import pl.bak.home_energy_controller.domain.dao.DeviceRepository;
+import pl.bak.home_energy_controller.domain.model.AdditionalDevice;
+import pl.bak.home_energy_controller.domain.model.Device;
 import pl.bak.home_energy_controller.mappers.dto.BulbDetailsDto;
+import pl.bak.home_energy_controller.mappers.dto.DeviceSummaryDto;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -12,20 +17,45 @@ import java.util.Optional;
 public class DeviceController {
 
     private final DeviceRepository deviceRepository;
+    private final AdditionalDeviceRepository additionalDeviceRepository;
 
-    public DeviceController(DeviceRepository deviceRepository) {
+    public DeviceController(DeviceRepository deviceRepository,
+                            AdditionalDeviceRepository additionalDeviceRepository) {
         this.deviceRepository = deviceRepository;
+        this.additionalDeviceRepository = additionalDeviceRepository;
     }
 
-    /**
-     * Uzupełnia / aktualizuje dane żarówki dla urządzenia (np. lampki).
-     *
-     * POST /api/devices/3/bulb
-     * {
-     *   "bulbDescription": "Philips GU10 5.5W",
-     *   "ratedPowerW": 5.5
-     * }
-     */
+    @GetMapping
+    public List<DeviceSummaryDto> getAllDevices() {
+        List<DeviceSummaryDto> result = new ArrayList<>();
+
+        for (Device d : deviceRepository.findAll()) {
+            DeviceSummaryDto dto = new DeviceSummaryDto();
+            dto.setId(d.getId());
+            dto.setSource("TUYA");
+            dto.setName(d.getName());
+            dto.setCategory(d.getCategory());
+            dto.setOnline(d.getOnline());
+            dto.setRatedPowerW(d.getRatedPowerW());
+            dto.setDescription(d.getBulbDescription());
+            result.add(dto);
+        }
+
+        for (AdditionalDevice ad : additionalDeviceRepository.findAll()) {
+            DeviceSummaryDto dto = new DeviceSummaryDto();
+            dto.setId(ad.getId());
+            dto.setSource("ADDITIONAL");
+            dto.setName(ad.getName());
+            dto.setCategory(ad.getCategory());
+            dto.setOnline(null);
+            dto.setRatedPowerW(ad.getRatedPowerW());
+            dto.setDescription(ad.getDescription());
+            result.add(dto);
+        }
+
+        return result;
+    }
+
     @PostMapping("/{deviceId}/bulb")
     public Device updateBulbDetails(@PathVariable Long deviceId,
                                     @RequestBody BulbDetailsDto dto) {
