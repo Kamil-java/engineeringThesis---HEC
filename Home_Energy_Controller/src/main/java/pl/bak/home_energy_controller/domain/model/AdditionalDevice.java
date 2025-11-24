@@ -12,27 +12,15 @@ public class AdditionalDevice {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * Nazwa urządzenia widoczna w UI.
-     */
     @Column(name = "name", nullable = false)
     private String name;
 
-    /**
-     * Kategoria – np. "light", "pc", "tv" albo cokolwiek przyjmiesz na froncie.
-     */
     @Column(name = "category")
     private String category;
 
-    /**
-     * Moc znamionowa w W – potrzebne do obliczeń energii.
-     */
     @Column(name = "rated_power_w")
     private Double ratedPowerW;
 
-    /**
-     * Dodatkowy opis (np. "Lampa biurkowa", "Listwa przy TV").
-     */
     @Column(name = "description")
     private String description;
 
@@ -54,11 +42,12 @@ public class AdditionalDevice {
         this.updatedAt = Instant.now();
     }
 
-    public AdditionalDevice() {
-    }
-
     public Long getId() {
         return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public String getName() {
@@ -97,7 +86,15 @@ public class AdditionalDevice {
         return createdAt;
     }
 
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

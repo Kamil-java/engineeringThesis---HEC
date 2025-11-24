@@ -1,6 +1,9 @@
 package pl.bak.home_energy_controller.rest;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import pl.bak.home_energy_controller.domain.dao.AdditionalDeviceRepository;
 import pl.bak.home_energy_controller.domain.dao.DeviceRepository;
 import pl.bak.home_energy_controller.domain.model.AdditionalDevice;
@@ -65,8 +68,9 @@ public class DeviceController {
     public Device updateBulbDetails(@PathVariable Long deviceId,
                                     @RequestBody BulbDetailsDto dto) {
         Optional<Device> opt = deviceRepository.findById(deviceId);
+
         if (opt.isEmpty()) {
-            throw new IllegalArgumentException("Device not found: " + deviceId);
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
 
         Device device = opt.get();

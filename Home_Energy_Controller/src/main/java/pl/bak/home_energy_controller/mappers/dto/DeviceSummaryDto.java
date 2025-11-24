@@ -4,17 +4,8 @@ import java.time.Instant;
 
 public class DeviceSummaryDto {
 
-    /**
-     * ID z bazy. Uwaga: może się pokrywać między TUYA i ADDITIONAL,
-     * dlatego jest też pole "source".
-     */
     private Long id;
-
-    /**
-     * "TUYA" albo "ADDITIONAL"
-     */
     private String source;
-
     private String name;
     private String category;
     private String model;
@@ -22,27 +13,9 @@ public class DeviceSummaryDto {
     private Instant lastUpdate;
     private Instant createdAt;
     private Instant updatedAt;
-
-
-    /**
-     * online/offline tylko dla urządzeń z Tuya,
-     * dla ADDITIONAL będzie null.
-     */
     private Boolean online;
-
-    /**
-     * Moc znamionowa – dla Tuya z Device.ratedPowerW,
-     * dla additional z AdditionalDevice.ratedPowerW.
-     */
     private Double ratedPowerW;
-
-    /**
-     * Opis / bulbDescription / itp.
-     */
     private String description;
-
-    public DeviceSummaryDto() {
-    }
 
     public Long getId() {
         return id;
@@ -74,30 +47,6 @@ public class DeviceSummaryDto {
 
     public void setCategory(String category) {
         this.category = category;
-    }
-
-    public Boolean getOnline() {
-        return online;
-    }
-
-    public void setOnline(Boolean online) {
-        this.online = online;
-    }
-
-    public Double getRatedPowerW() {
-        return ratedPowerW;
-    }
-
-    public void setRatedPowerW(Double ratedPowerW) {
-        this.ratedPowerW = ratedPowerW;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
     }
 
     public String getModel() {
@@ -138,5 +87,29 @@ public class DeviceSummaryDto {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Boolean getOnline() {
+        return online;
+    }
+
+    public void setOnline(Boolean online) {
+        this.online = online;
+    }
+
+    public Double getRatedPowerW() {
+        return ratedPowerW;
+    }
+
+    public void setRatedPowerW(Double ratedPowerW) {
+        this.ratedPowerW = ratedPowerW;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

@@ -1,13 +1,13 @@
-// src/App.jsx
 import React, { useState } from 'react';
 import DeviceDashboard from './components/DeviceDashboard';
 import ManageAdditionalDevices from './components/ManageAdditionalDevices';
 import CostCalculator from './components/CostCalculator';
 import EnergyHistory from './components/EnergyHistory';
-import TariffSettings from './components/TariffSettings'; // 🔵 NOWY IMPORT
+import TariffSettings from './components/TariffSettings';
+import EnergyAdvisor from './components/EnergyAdvisor';
+
 
 function App() {
-  // 'dashboard' | 'manageAdditional' | 'estimation' | 'history' | 'tariff'
   const [activeView, setActiveView] = useState('dashboard');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -18,10 +18,8 @@ function App() {
 
   return (
     <div className="bg-light min-vh-100">
-      {/* Navbar */}
       <nav className="navbar navbar-dark bg-dark">
         <div className="container-fluid">
-          {/* Hamburger - tylko na małych ekranach */}
           <button
             type="button"
             className="btn btn-outline-light border-0 d-lg-none me-2"
@@ -35,7 +33,6 @@ function App() {
             Home Energy Controller
           </span>
 
-          {/* Menu na dużych ekranach */}
           <ul className="navbar-nav ms-auto mb-0 d-none d-lg-flex flex-row">
             <li className="nav-item me-3">
               <button
@@ -87,7 +84,7 @@ function App() {
                 Historia kosztów
               </button>
             </li>
-            <li className="nav-item">
+            <li className="nav-item me-3">
               <button
                 type="button"
                 className={
@@ -99,11 +96,22 @@ function App() {
                 Ustawienia taryfy
               </button>
             </li>
+            <li className="nav-item me-3">
+              <button
+                type="button"
+                className={
+                  'nav-link btn btn-link px-0 text-decoration-none ' +
+                  (activeView === 'advisor' ? 'fw-bold text-white' : 'text-light')
+                }
+                onClick={() => handleNavClick('advisor')}
+              >
+                Asystent energii
+              </button>
+            </li>
           </ul>
         </div>
       </nav>
-
-      {/* Menu rozwijane na małych ekranach */}
+      
       {mobileNavOpen && (
         <div className="bg-dark d-lg-none">
           <div className="container-fluid py-2">
@@ -157,16 +165,27 @@ function App() {
             >
               Ustawienia taryfy
             </button>
+            <button
+              type="button"
+              className={
+                'btn w-100 text-start text-light mb-2 ' +
+                (activeView === 'advisor' ? 'fw-bold' : '')
+              }
+              onClick={() => handleNavClick('advisor')}
+            >
+              Asystent energii
+            </button>
           </div>
         </div>
       )}
 
-      {/* Główna zawartość */}
+
       {activeView === 'dashboard' && <DeviceDashboard />}
       {activeView === 'manageAdditional' && <ManageAdditionalDevices />}
       {activeView === 'estimation' && <CostCalculator />}
       {activeView === 'history' && <EnergyHistory />}
       {activeView === 'tariff' && <TariffSettings />}
+      {activeView === 'advisor' && <EnergyAdvisor />}
     </div>
   );
 }

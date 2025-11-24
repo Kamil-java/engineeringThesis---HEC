@@ -12,10 +12,6 @@ public class AdditionalDeviceDto {
     private Instant createdAt;
     private Instant updatedAt;
 
-
-    public AdditionalDeviceDto() {
-    }
-
     public Long getId() {
         return id;
     }

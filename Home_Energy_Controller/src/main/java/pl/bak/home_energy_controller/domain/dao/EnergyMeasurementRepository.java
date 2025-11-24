@@ -24,7 +24,5 @@ public interface EnergyMeasurementRepository extends JpaRepository<EnergyMeasure
             @Param("deviceId") Long deviceId,
             @Param("since") Instant since
     );
-
-    Optional<EnergyMeasurement> findTopByDeviceOrderByMeasuredAtDesc(Device device);
 }
 

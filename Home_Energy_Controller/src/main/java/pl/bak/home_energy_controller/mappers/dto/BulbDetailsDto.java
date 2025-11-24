@@ -5,9 +5,6 @@ public class BulbDetailsDto {
     private String bulbDescription;
     private Double ratedPowerW;
 
-    public BulbDetailsDto() {
-    }
-
     public String getBulbDescription() {
         return bulbDescription;
     }

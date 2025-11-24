@@ -168,7 +168,6 @@ function ManageAdditionalDevices() {
   return (
     <div className="bg-light min-vh-100">
       <div className="pb-5 pt-3 px-3 px-md-4 px-lg-5">
-        {/* Nagłówek */}
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
           <div>
             <h2 className="mb-1">Zarządzaj dodanymi urządzeniami</h2>
@@ -192,7 +191,6 @@ function ManageAdditionalDevices() {
         )}
 
         <div className="row g-4">
-          {/* Lista urządzeń */}
           <div className="col-12 col-lg-8">
             <div className="card shadow-sm h-100">
               <div className="card-body">
@@ -285,7 +283,6 @@ function ManageAdditionalDevices() {
             </div>
           </div>
 
-          {/* Formularz dodawania/edycji */}
           <div className="col-12 col-lg-4">
             <div className="card shadow-sm h-100">
               <div className="card-body">

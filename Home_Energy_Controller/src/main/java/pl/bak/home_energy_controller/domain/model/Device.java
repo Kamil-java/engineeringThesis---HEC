@@ -31,18 +31,6 @@ public class Device {
     @Column(name = "online")
     private Boolean online;
 
-    @Column(name = "last_power_w")
-    private Double lastPowerW;
-
-    @Column(name = "last_voltage_v")
-    private Double lastVoltageV;
-
-    @Column(name = "last_current_ma")
-    private Integer lastCurrentMa;
-
-    @Column(name = "last_energy_kwh")
-    private Double lastEnergyKwh;
-
     @Column(name = "last_update")
     private Instant lastUpdate;
 
@@ -57,38 +45,6 @@ public class Device {
 
     @Column(name = "bulb_description")
     private String bulbDescription;
-
-    public Double getRatedPowerW() {
-        return ratedPowerW;
-    }
-
-    public void setRatedPowerW(Double ratedPowerW) {
-        this.ratedPowerW = ratedPowerW;
-    }
-
-    public String getBulbDescription() {
-        return bulbDescription;
-    }
-
-    public void setBulbDescription(String bulbDescription) {
-        this.bulbDescription = bulbDescription;
-    }
-
-    public Boolean getLastSwitchOn() {
-        return lastSwitchOn;
-    }
-
-    public void setLastSwitchOn(Boolean lastSwitchOn) {
-        this.lastSwitchOn = lastSwitchOn;
-    }
-
-    public Instant getLastSwitchOnSince() {
-        return lastSwitchOnSince;
-    }
-
-    public void setLastSwitchOnSince(Instant lastSwitchOnSince) {
-        this.lastSwitchOnSince = lastSwitchOnSince;
-    }
 
     public Long getId() {
         return id;
@@ -146,43 +102,43 @@ public class Device {
         this.online = online;
     }
 
-    public Double getLastPowerW() {
-        return lastPowerW;
-    }
-
-    public void setLastPowerW(Double lastPowerW) {
-        this.lastPowerW = lastPowerW;
-    }
-
-    public Double getLastVoltageV() {
-        return lastVoltageV;
-    }
-
-    public void setLastVoltageV(Double lastVoltageV) {
-        this.lastVoltageV = lastVoltageV;
-    }
-
-    public Integer getLastCurrentMa() {
-        return lastCurrentMa;
-    }
-
-    public void setLastCurrentMa(Integer lastCurrentMa) {
-        this.lastCurrentMa = lastCurrentMa;
-    }
-
-    public Double getLastEnergyKwh() {
-        return lastEnergyKwh;
-    }
-
-    public void setLastEnergyKwh(Double lastEnergyKwh) {
-        this.lastEnergyKwh = lastEnergyKwh;
-    }
-
     public Instant getLastUpdate() {
         return lastUpdate;
     }
 
     public void setLastUpdate(Instant lastUpdate) {
         this.lastUpdate = lastUpdate;
+    }
+
+    public Boolean getLastSwitchOn() {
+        return lastSwitchOn;
+    }
+
+    public void setLastSwitchOn(Boolean lastSwitchOn) {
+        this.lastSwitchOn = lastSwitchOn;
+    }
+
+    public Instant getLastSwitchOnSince() {
+        return lastSwitchOnSince;
+    }
+
+    public void setLastSwitchOnSince(Instant lastSwitchOnSince) {
+        this.lastSwitchOnSince = lastSwitchOnSince;
+    }
+
+    public Double getRatedPowerW() {
+        return ratedPowerW;
+    }
+
+    public void setRatedPowerW(Double ratedPowerW) {
+        this.ratedPowerW = ratedPowerW;
+    }
+
+    public String getBulbDescription() {
+        return bulbDescription;
+    }
+
+    public void setBulbDescription(String bulbDescription) {
+        this.bulbDescription = bulbDescription;
     }
 }

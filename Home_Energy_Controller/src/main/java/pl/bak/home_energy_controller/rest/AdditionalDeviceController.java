@@ -55,6 +55,7 @@ public class AdditionalDeviceController {
     public ResponseEntity<AdditionalDeviceDto> update(@PathVariable Long id,
                                                       @RequestBody AdditionalDeviceDto dto) {
         Optional<AdditionalDevice> opt = additionalDeviceRepository.findById(id);
+
         if (opt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }

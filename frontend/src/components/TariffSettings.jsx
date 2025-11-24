@@ -1,4 +1,3 @@
-// src/components/TariffSettings.jsx
 import React, { useEffect, useState } from 'react';
 import { fetchTariffSettings, updateTariffSettings } from '../api/deviceApi';
 
@@ -152,7 +151,6 @@ function TariffSettings() {
   return (
     <div className="bg-light min-vh-100">
       <div className="pb-5 pt-3 px-3 px-md-4 px-lg-5">
-        {/* Nagłówek */}
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
           <div>
             <h2 className="mb-1">Ustawienia taryfy energii</h2>
@@ -175,7 +173,6 @@ function TariffSettings() {
         )}
 
         <div className="row g-4">
-          {/* Podsumowanie aktualnych stawek */}
           <div className="col-12 col-lg-5">
             <div className="card shadow-sm h-100 bg-gradient-primary text-white border-0">
               <div className="card-body d-flex flex-column">
@@ -238,7 +235,6 @@ function TariffSettings() {
             </div>
           </div>
 
-          {/* Formularz edycji */}
           <div className="col-12 col-lg-7">
             <div className="card shadow-sm h-100">
               <div className="card-body">
@@ -313,7 +309,6 @@ function TariffSettings() {
                       className="btn btn-outline-secondary"
                       disabled={saving}
                       onClick={() => {
-                        // reset do tego co jest w settings
                         setFormData({
                           netRatePerKwh:
                             netRatePerKwh != null ? String(netRatePerKwh) : '',

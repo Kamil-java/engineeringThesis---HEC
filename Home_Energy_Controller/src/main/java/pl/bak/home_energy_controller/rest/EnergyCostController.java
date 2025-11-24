@@ -25,11 +25,7 @@ public class EnergyCostController {
             @PathVariable Long deviceId,
             @RequestParam(name = "hours", defaultValue = "5") double hours
     ) {
-        return energyCostService.estimateCostForDeviceOverHours(
-                deviceId,
-                hours,
-                ZoneId.of("Europe/Warsaw")
-        );
+        return energyCostService.estimateCostForDeviceOverHours(deviceId, hours);
     }
 
     @GetMapping("/device/{deviceId}/current-month")
@@ -39,24 +35,11 @@ public class EnergyCostController {
         Instant from = ym.atDay(1).atStartOfDay(zoneId).toInstant();
         Instant to = ym.plusMonths(1).atDay(1).atStartOfDay(zoneId).toInstant();
 
-        BigDecimal energyKwh = energyCostService
-                .calculateEnergyKwhForDeviceBetween(deviceId, from, to);
-        BigDecimal cost = energyCostService
-                .calculateCostForDeviceBetween(deviceId, from, to);
-        BigDecimal avgPowerW = energyCostService
-                .calculateAveragePowerWForPeriod(energyKwh, from, to);
+        Map<String, Object> resp = energyCostService.buildPeriodDeviceCostResponse(deviceId, from, to);
+        resp.put("year", ym.getYear());
+        resp.put("month", ym.getMonthValue());
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("deviceId", deviceId);
-        response.put("year", ym.getYear());
-        response.put("month", ym.getMonthValue());
-        response.put("from", from);
-        response.put("to", to);
-        response.put("energyKwh", energyKwh);
-        response.put("cost", cost);
-        response.put("avgPowerW", avgPowerW); // NOWE
-
-        return response;
+        return resp;
     }
 
     @GetMapping("/device/{deviceId}/today")
@@ -66,53 +49,27 @@ public class EnergyCostController {
         Instant from = today.atStartOfDay(zoneId).toInstant();
         Instant to = today.plusDays(1).atStartOfDay(zoneId).toInstant();
 
-        BigDecimal energyKwh = energyCostService
-                .calculateEnergyKwhForDeviceBetween(deviceId, from, to);
-        BigDecimal cost = energyCostService
-                .calculateCostForDeviceBetween(deviceId, from, to);
-        BigDecimal avgPowerW = energyCostService
-                .calculateAveragePowerWForPeriod(energyKwh, from, to);
-
-        Map<String, Object> resp = new HashMap<>();
-        resp.put("deviceId", deviceId);
+        Map<String, Object> resp = energyCostService.buildPeriodDeviceCostResponse(deviceId, from, to);
         resp.put("year", today.getYear());
         resp.put("month", today.getMonthValue());
         resp.put("day", today.getDayOfMonth());
-        resp.put("from", from);
-        resp.put("to", to);
-        resp.put("energyKwh", energyKwh);
-        resp.put("cost", cost);
-        resp.put("avgPowerW", avgPowerW);
+
         return resp;
     }
 
-    /**
-     * Zużycie energii / koszt / średnia moc z ostatniej godziny.
-     */
     @GetMapping("/device/{deviceId}/last-hour")
     public Map<String, Object> getLastHourDeviceCost(@PathVariable Long deviceId) {
         Instant to = Instant.now();
         Instant from = to.minus(1, ChronoUnit.HOURS);
 
-        BigDecimal energyKwh = energyCostService
-                .calculateEnergyKwhForDeviceBetween(deviceId, from, to);
-        BigDecimal cost = energyCostService
-                .calculateCostForDeviceBetween(deviceId, from, to);
-        BigDecimal avgPowerW = energyCostService
-                .calculateAveragePowerWForPeriod(energyKwh, from, to);
+        Map<String, Object> resp = energyCostService.buildPeriodDeviceCostResponse(deviceId, from, to);
 
         ZonedDateTime zFrom = from.atZone(zoneId);
         ZonedDateTime zTo = to.atZone(zoneId);
 
-        Map<String, Object> resp = new HashMap<>();
-        resp.put("deviceId", deviceId);
-        resp.put("from", from);
-        resp.put("to", to);
         resp.put("fromHour", zFrom.getHour());
         resp.put("toHour", zTo.getHour());
-        resp.put("energyKwh", energyKwh);
-        resp.put("cost", cost);
-        resp.put("avgPowerW", avgPowerW);
+
         return resp;
     }
 
@@ -158,14 +115,13 @@ public class EnergyCostController {
 
     @GetMapping("/lighting/device/{deviceId}/current-month")
     public Map<String, Object> getCurrentMonthLightingCost(@PathVariable Long deviceId) {
-        YearMonth ym = YearMonth.now(ZoneId.of("Europe/Warsaw"));
-        ZoneId zone = ZoneId.of("Europe/Warsaw");
+        YearMonth ym = YearMonth.now(zoneId);
 
         BigDecimal energyKwh = energyCostService
-                .calculateLightingEnergyKwhForDevice(deviceId, ym, zone);
+                .calculateLightingEnergyKwhForDevice(deviceId, ym, zoneId);
 
         BigDecimal cost = energyCostService
-                .calculateLightingCostForDevice(deviceId, ym, zone);
+                .calculateLightingCostForDevice(deviceId, ym, zoneId);
 
         Map<String, Object> resp = new HashMap<>();
         resp.put("deviceId", deviceId);
@@ -178,4 +134,5 @@ public class EnergyCostController {
     }
 
 }
+
 

@@ -1,18 +1,17 @@
-// src/api/deviceApi.js
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8080', // ew. zmień jeśli backend ma inny adres
+  baseURL: 'http://localhost:8080',
 });
 
-// ------ URZĄDZENIA (lista – Tuya + Additional jako summary DTO) ------
+// ------ URZĄDZENIA ------
 
 export async function fetchAllDevices() {
   const res = await api.get('/api/devices');
 
   return res.data.map((d) => ({
     id: d.id,
-    source: d.source, // "TUYA" albo "ADDITIONAL"
+    source: d.source,
     name: d.name,
     category: d.category,
     online: d.online ?? null,
@@ -23,16 +22,12 @@ export async function fetchAllDevices() {
     model: d.model ?? null,
     ip: d.ip ?? null,
     lastUpdate: d.lastUpdate ?? null,
-
-    // 🔴 KLUCZOWE: NIE UTRAC DANYCH O DATAH
     createdAt: d.createdAt ?? d.created_at ?? null,
     updatedAt: d.updatedAt ?? d.updated_at ?? null,
   }));
 }
 
-// 🔄 TUYA: update bulb details (bulbDescription, ratedPowerW)
 export async function updateBulbDetails(deviceId, payload) {
-  // payload: { bulbDescription?: string, ratedPowerW?: number }
   const response = await api.post(`/api/devices/${deviceId}/bulb`, payload);
   return response.data;
 }
@@ -134,6 +129,12 @@ export async function fetchTariffSettings() {
 
 export async function updateTariffSettings(dto) {
   const res = await api.put('/api/tariff/settings', dto);
+  return res.data;
+}
+
+// ------ BOT ------
+export async function fetchAdvisorMonthly() {
+  const res = await api.get('/api/advisor/monthly');
   return res.data;
 }
 

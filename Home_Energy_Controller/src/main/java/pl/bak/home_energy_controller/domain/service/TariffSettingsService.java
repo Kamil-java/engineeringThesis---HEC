@@ -7,9 +7,13 @@ import pl.bak.home_energy_controller.domain.model.TariffSettings;
 import pl.bak.home_energy_controller.mappers.dto.TariffSettingsDto;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Service
 public class TariffSettingsService {
+
+    private static final long SETTINGS_ID = 1L;
+    private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
     private final TariffSettingsRepository repository;
 
@@ -19,13 +23,31 @@ public class TariffSettingsService {
 
     @Transactional(readOnly = true)
     public TariffSettingsDto getCurrentSettings() {
-        TariffSettings entity = repository.findById(1L)
+        TariffSettings entity = loadOrCreateSettings();
+        return toDto(entity);
+    }
+
+    @Transactional
+    public TariffSettingsDto updateSettings(TariffSettingsDto dto) {
+        TariffSettings entity = loadOrCreateSettings();
+
+        applyDtoToEntity(dto, entity);
+        fillMissingNetRate(entity);
+
+        TariffSettings saved = repository.save(entity);
+        return toDto(saved);
+    }
+
+    private TariffSettings loadOrCreateSettings() {
+        return repository.findById(SETTINGS_ID)
                 .orElseGet(() -> {
                     TariffSettings t = new TariffSettings();
-                    t.setId(1L);
+                    t.setId(SETTINGS_ID);
                     return t;
                 });
+    }
 
+    private TariffSettingsDto toDto(TariffSettings entity) {
         TariffSettingsDto dto = new TariffSettingsDto();
         dto.setNetRatePerKwh(entity.getNetRatePerKwh());
         dto.setGrossRatePerKwh(entity.getGrossRatePerKwh());
@@ -34,16 +56,7 @@ public class TariffSettingsService {
         return dto;
     }
 
-    @Transactional
-    public TariffSettingsDto updateSettings(TariffSettingsDto dto) {
-        TariffSettings entity = repository.findById(1L)
-                .orElseGet(() -> {
-                    TariffSettings t = new TariffSettings();
-                    t.setId(1L);
-                    return t;
-                });
-
-        // UZUPEŁNIANIE – nie nadpisuj istniejących wartości nullami
+    private void applyDtoToEntity(TariffSettingsDto dto, TariffSettings entity) {
         if (dto.getNetRatePerKwh() != null) {
             entity.setNetRatePerKwh(dto.getNetRatePerKwh());
         }
@@ -53,30 +66,21 @@ public class TariffSettingsService {
         if (dto.getVatPercent() != null) {
             entity.setVatPercent(dto.getVatPercent());
         }
+    }
 
-        // DODATKOWO: można tu wyliczyć brakującą stawkę z netto/brutto + VAT,
-        // jeśli chcesz mieć zawsze spójność.
-        // Np. jeśli mamy gross i VAT, a net jest null:
+    private void fillMissingNetRate(TariffSettings entity) {
         if (entity.getGrossRatePerKwh() != null &&
                 entity.getVatPercent() != null &&
                 entity.getNetRatePerKwh() == null) {
-            BigDecimal hundred = BigDecimal.valueOf(100);
+
             BigDecimal divider = BigDecimal.ONE.add(
-                    entity.getVatPercent().divide(hundred)
+                    entity.getVatPercent()
+                            .divide(ONE_HUNDRED, 10, RoundingMode.HALF_UP)
             );
+
             entity.setNetRatePerKwh(
-                    entity.getGrossRatePerKwh().divide(divider, 4, BigDecimal.ROUND_HALF_UP)
+                    entity.getGrossRatePerKwh().divide(divider, 4, RoundingMode.HALF_UP)
             );
         }
-
-        TariffSettings saved = repository.save(entity);
-
-        TariffSettingsDto resp = new TariffSettingsDto();
-        resp.setNetRatePerKwh(saved.getNetRatePerKwh());
-        resp.setGrossRatePerKwh(saved.getGrossRatePerKwh());
-        resp.setVatPercent(saved.getVatPercent());
-        resp.setUpdatedAt(saved.getUpdatedAt());
-
-        return resp;
     }
 }

@@ -9,7 +9,7 @@ import java.time.Instant;
 public class TariffSettings {
 
     @Id
-    private Long id = 1L; // singleton
+    private Long id = 1L;
 
     @Column(name = "net_rate_per_kwh", precision = 10, scale = 4)
     private BigDecimal netRatePerKwh;
@@ -28,8 +28,6 @@ public class TariffSettings {
     public void touchUpdateTime() {
         this.updatedAt = Instant.now();
     }
-
-    // --- gettery/settery ---
 
     public Long getId() {
         return id;

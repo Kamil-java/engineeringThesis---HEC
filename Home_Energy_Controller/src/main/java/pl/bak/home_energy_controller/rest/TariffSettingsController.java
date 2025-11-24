@@ -1,5 +1,6 @@
 package pl.bak.home_energy_controller.rest;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import pl.bak.home_energy_controller.domain.service.TariffSettingsService;
 import pl.bak.home_energy_controller.mappers.dto.TariffSettingsDto;
