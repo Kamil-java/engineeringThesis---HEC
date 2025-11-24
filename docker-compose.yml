@@ -11,5 +11,34 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U admin -d hec" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./Home_Energy_Controller
+    container_name: hec-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/hec
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_PROFILES_ACTIVE: docker
+      TZ: Europe/Warsaw
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build: ./frontend
+    container_name: hec-frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
 volumes:
   pgdata:
