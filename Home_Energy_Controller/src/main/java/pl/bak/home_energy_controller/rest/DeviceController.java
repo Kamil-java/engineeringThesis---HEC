@@ -53,6 +53,8 @@ public class DeviceController {
             dto.setOnline(null);
             dto.setRatedPowerW(ad.getRatedPowerW());
             dto.setDescription(ad.getDescription());
+            dto.setCreatedAt(ad.getCreatedAt());
+            dto.setUpdatedAt(ad.getUpdatedAt());
             result.add(dto);
         }
 

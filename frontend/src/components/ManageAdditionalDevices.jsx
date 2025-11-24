@@ -1,3 +1,4 @@
+// src/components/ManageAdditionalDevices.jsx
 import React, { useEffect, useState } from 'react';
 import {
   fetchAdditionalDevices,
@@ -9,22 +10,31 @@ import {
 function ManageAdditionalDevices() {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
-  const [form, setForm] = useState({
-    id: null,
+  const [error, setError] = useState(null);
+  const [infoMessage, setInfoMessage] = useState(null);
+
+  const [editingId, setEditingId] = useState(null);
+  const [formData, setFormData] = useState({
     name: '',
     category: '',
     ratedPowerW: '',
     description: '',
   });
-  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadDevices();
-  }, []);
+  const resetForm = () => {
+    setEditingId(null);
+    setFormData({
+      name: '',
+      category: '',
+      ratedPowerW: '',
+      description: '',
+    });
+  };
 
-  async function loadDevices() {
+  const loadDevices = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -32,278 +42,352 @@ function ManageAdditionalDevices() {
       setDevices(data);
     } catch (e) {
       console.error(e);
-      setError('Nie udało się pobrać urządzeń dodatkowych.');
+      setError('Nie udało się pobrać listy dodatkowych urządzeń.');
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  function handleChange(e) {
+  useEffect(() => {
+    loadDevices();
+  }, []);
+
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: name === 'ratedPowerW' ? value.replace(',', '.') : value,
+      [name]: value,
     }));
-  }
+  };
 
-  function resetForm() {
-    setForm({
-      id: null,
-      name: '',
-      category: '',
-      ratedPowerW: '',
-      description: '',
-    });
-  }
-
-  function startEdit(device) {
-    setForm({
-      id: device.id,
+  const handleEdit = (device) => {
+    setEditingId(device.id);
+    setFormData({
       name: device.name || '',
       category: device.category || '',
       ratedPowerW:
-        device.ratedPowerW !== null && device.ratedPowerW !== undefined
-          ? String(device.ratedPowerW)
-          : '',
+        device.ratedPowerW != null ? String(device.ratedPowerW) : '',
       description: device.description || '',
     });
-  }
+    setInfoMessage(null);
+    setError(null);
+  };
 
-  async function handleSubmit(e) {
+  const handleCancel = () => {
+    resetForm();
+    setInfoMessage(null);
+    setError(null);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.name.trim()) {
-      alert('Nazwa jest wymagana');
+    const payload = {
+      name: formData.name.trim(),
+      category: formData.category.trim() || null,
+      ratedPowerW:
+        formData.ratedPowerW.trim() !== ''
+          ? parseFloat(formData.ratedPowerW)
+          : null,
+      description: formData.description.trim() || null,
+    };
+
+    if (!payload.name) {
+      alert('Nazwa urządzenia jest wymagana.');
       return;
     }
 
-    const payload = {
-      name: form.name.trim(),
-      category: form.category.trim() || null,
-      ratedPowerW: form.ratedPowerW
-        ? parseFloat(form.ratedPowerW)
-        : null,
-      description: form.description.trim() || null,
-    };
+    if (
+      payload.ratedPowerW != null &&
+      (isNaN(payload.ratedPowerW) || payload.ratedPowerW <= 0)
+    ) {
+      alert('Moc znamionowa musi być dodatnią liczbą.');
+      return;
+    }
 
     try {
       setSaving(true);
+      setError(null);
+      setInfoMessage(null);
 
-      if (form.id == null) {
+      if (editingId == null) {
         await createAdditionalDevice(payload);
+        setInfoMessage('Dodano nowe urządzenie.');
       } else {
-        await updateAdditionalDevice(form.id, payload);
+        await updateAdditionalDevice(editingId, payload);
+        setInfoMessage('Zaktualizowano urządzenie.');
       }
 
       await loadDevices();
       resetForm();
     } catch (e) {
       console.error(e);
-      alert('Wystąpił błąd podczas zapisu urządzenia.');
+      setError('Nie udało się zapisać urządzenia.');
     } finally {
       setSaving(false);
     }
-  }
+  };
 
-  async function handleDelete(id) {
-    if (!window.confirm('Na pewno usunąć to urządzenie?')) {
+  const handleDelete = async (id) => {
+    const dev = devices.find((d) => d.id === id);
+    const label = dev ? dev.name : `ID=${id}`;
+    if (!window.confirm(`Czy na pewno chcesz usunąć urządzenie "${label}"?`)) {
       return;
     }
 
     try {
+      setDeletingId(id);
+      setError(null);
+      setInfoMessage(null);
+
       await deleteAdditionalDevice(id);
+      setInfoMessage(`Usunięto urządzenie "${label}".`);
       await loadDevices();
-      if (form.id === id) {
+
+      if (editingId === id) {
         resetForm();
       }
     } catch (e) {
       console.error(e);
-      alert('Nie udało się usunąć urządzenia.');
+      setError('Nie udało się usunąć urządzenia.');
+    } finally {
+      setDeletingId(null);
     }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-light min-vh-100 d-flex justify-content-center align-items-center">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Wczytywanie...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="bg-light min-vh-100">
-      {/* brak container – pełna szerokość ekranu; tylko padding */}
       <div className="pb-5 pt-3 px-3 px-md-4 px-lg-5">
-        <div className="row mb-4">
-          <div className="col-12">
+        {/* Nagłówek */}
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+          <div>
             <h2 className="mb-1">Zarządzaj dodanymi urządzeniami</h2>
             <p className="text-muted mb-0">
-              Dodawaj, edytuj i usuwaj urządzenia ręcznie dodane do systemu.
+              Tutaj konfigurujesz urządzenia, które nie są bezpośrednio z Tuya –
+              np. monitor, komputer, lampka bez smart-gniazdka. 
+              Te urządzenia są potem dostępne w sekcji estymacji kosztów.
             </p>
           </div>
         </div>
 
-        {loading ? (
-          <div className="d-flex justify-content-center py-5">
-            <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Wczytywanie...</span>
-            </div>
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            {error}
           </div>
-        ) : error ? (
-          <div className="alert alert-danger">{error}</div>
-        ) : (
-          <div className="row g-4">
-            {/* LISTA – na mobile cała szerokość, na >=lg 7/12 */}
-            <div className="col-12 col-lg-7">
-              <div className="card shadow-sm h-100">
-                <div className="card-header d-flex justify-content-between align-items-center">
-                  <h5 className="mb-0">Twoje urządzenia</h5>
-                  <span className="badge bg-secondary">
-                    {devices.length} urządzeń
+        )}
+        {infoMessage && (
+          <div className="alert alert-success" role="alert">
+            {infoMessage}
+          </div>
+        )}
+
+        <div className="row g-4">
+          {/* Lista urządzeń */}
+          <div className="col-12 col-lg-8">
+            <div className="card shadow-sm h-100">
+              <div className="card-body">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h5 className="card-title mb-0">
+                    Dodane urządzenia ({devices.length})
+                  </h5>
+                  <span className="badge bg-dark-subtle text-dark">
+                    CRUD: edytuj, usuń, przeglądaj
                   </span>
                 </div>
-                <div className="card-body p-0">
-                  {devices.length === 0 ? (
-                    <div className="p-3 text-muted">
-                      Nie dodałeś jeszcze żadnych urządzeń.
-                    </div>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover mb-0">
-                        <thead className="table-light">
-                          <tr>
-                            <th>Nazwa</th>
-                            <th>Kategoria</th>
-                            <th>Moc [W]</th>
-                            <th>Opis</th>
-                            <th className="text-end">Akcje</th>
+
+                {devices.length === 0 ? (
+                  <p className="text-muted mb-0">
+                    Nie dodałeś jeszcze żadnych urządzeń. Użyj formularza po prawej,
+                    aby dodać pierwsze urządzenie.
+                  </p>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table align-middle table-striped mb-0">
+                      <thead>
+                        <tr>
+                          <th>Nazwa</th>
+                          <th>Kategoria</th>
+                          <th>Moc [W]</th>
+                          <th>Opis</th>
+                          <th style={{ width: '130px' }} className="text-end">
+                            Akcje
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {devices.map((d) => (
+                          <tr key={d.id}>
+                            <td className="fw-semibold">{d.name}</td>
+                            <td>
+                              {d.category ? (
+                                <span className="badge bg-secondary-subtle text-dark">
+                                  {d.category}
+                                </span>
+                              ) : (
+                                <span className="text-muted small">brak</span>
+                              )}
+                            </td>
+                            <td>
+                              {d.ratedPowerW != null ? (
+                                <span>{d.ratedPowerW.toFixed(1)}</span>
+                              ) : (
+                                <span className="text-muted small">—</span>
+                              )}
+                            </td>
+                            <td>
+                              {d.description ? (
+                                <span className="small text-muted">
+                                  {d.description}
+                                </span>
+                              ) : (
+                                <span className="text-muted small">
+                                  brak opisu
+                                </span>
+                              )}
+                            </td>
+                            <td className="text-end">
+                              <div className="btn-group btn-group-sm" role="group">
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-primary"
+                                  onClick={() => handleEdit(d)}
+                                  disabled={deletingId === d.id}
+                                >
+                                  ✏️ Edytuj
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-outline-danger ms-1"
+                                  onClick={() => handleDelete(d.id)}
+                                  disabled={deletingId === d.id}
+                                >
+                                  {deletingId === d.id ? 'Usuwanie…' : '🗑 Usuń'}
+                                </button>
+                              </div>
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {devices.map((dev) => (
-                            <tr key={dev.id}>
-                              <td>{dev.name}</td>
-                              <td>{dev.category || '-'}</td>
-                              <td>
-                                {dev.ratedPowerW != null
-                                  ? dev.ratedPowerW
-                                  : '-'}
-                              </td>
-                              <td
-                                className="text-truncate"
-                                style={{ maxWidth: '260px' }}
-                              >
-                                {dev.description || '-'}
-                              </td>
-                              <td className="text-end">
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-outline-primary me-4"  // <- większy odstęp
-                                  onClick={() => startEdit(dev)}
-                                >
-                                    Edytuj
-                                </button>
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-outline-danger"
-                                  onClick={() => handleDelete(dev.id)}
-                                >
-                                  Usuń
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
+          </div>
 
-            {/* FORMULARZ – na mobile cała szerokość, na >=lg 5/12 */}
-            <div className="col-12 col-lg-5">
-              <div className="card shadow-sm h-100">
-                <div className="card-header">
-                  <h5 className="mb-0">
-                    {form.id == null
-                      ? 'Dodaj nowe urządzenie'
-                      : 'Edytuj urządzenie'}
-                  </h5>
-                </div>
-                <div className="card-body">
-                  <form onSubmit={handleSubmit}>
-                    <div className="mb-3">
-                      <label className="form-label">Nazwa *</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="name"
-                        value={form.name}
-                        onChange={handleChange}
-                        required
-                      />
-                    </div>
+          {/* Formularz dodawania/edycji */}
+          <div className="col-12 col-lg-4">
+            <div className="card shadow-sm h-100">
+              <div className="card-body">
+                <h5 className="card-title mb-1">
+                  {editingId == null ? 'Dodaj nowe urządzenie' : 'Edytuj urządzenie'}
+                </h5>
+                <p className="text-muted small mb-3">
+                  Uzupełnij podstawowe informacje – nazwa, kategoria i moc
+                  znamionowa są kluczowe do poprawnej estymacji kosztów.
+                </p>
 
-                    <div className="mb-3">
-                      <label className="form-label">Kategoria</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="category"
-                        value={form.category}
-                        onChange={handleChange}
-                        placeholder="np. light, monitor, pc"
-                      />
-                    </div>
+                <form onSubmit={handleSubmit}>
+                  <div className="mb-3">
+                    <label className="form-label">
+                      Nazwa urządzenia <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      placeholder="np. Monitor 27''"
+                      required
+                    />
+                  </div>
 
-                    <div className="mb-3">
-                      <label className="form-label">Moc znamionowa [W]</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        className="form-control"
-                        name="ratedPowerW"
-                        value={form.ratedPowerW}
-                        onChange={handleChange}
-                        placeholder="np. 35"
-                      />
-                      <div className="form-text">
-                        Używane do wyliczania zużycia energii.
-                      </div>
-                    </div>
+                  <div className="mb-3">
+                    <label className="form-label">Kategoria</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="category"
+                      value={formData.category}
+                      onChange={handleInputChange}
+                      placeholder="np. RTV, AGD, Oświetlenie"
+                    />
+                    <small className="text-muted">
+                      Dowolny tekst, pomoże pogrupować urządzenia.
+                    </small>
+                  </div>
 
-                    <div className="mb-3">
-                      <label className="form-label">Opis</label>
-                      <textarea
-                        className="form-control"
-                        rows="3"
-                        name="description"
-                        value={form.description}
-                        onChange={handleChange}
-                        placeholder="np. Lampa biurkowa w salonie"
-                      />
-                    </div>
+                  <div className="mb-3">
+                    <label className="form-label">Moc znamionowa [W]</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      className="form-control"
+                      name="ratedPowerW"
+                      value={formData.ratedPowerW}
+                      onChange={handleInputChange}
+                      placeholder="np. 35"
+                    />
+                    <small className="text-muted">
+                      Jeśli znasz moc z tabliczki znamionowej – wpisz ją tutaj.
+                    </small>
+                  </div>
 
-                    <div className="d-flex justify-content-between">
+                  <div className="mb-3">
+                    <label className="form-label">Opis</label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      placeholder="np. Monitor biurkowy używany do pracy."
+                    />
+                  </div>
+
+                  <div className="d-flex justify-content-between mt-3">
+                    {editingId != null ? (
                       <button
                         type="button"
                         className="btn btn-outline-secondary"
-                        onClick={resetForm}
+                        onClick={handleCancel}
                         disabled={saving}
                       >
-                        Wyczyść
+                        Anuluj edycję
                       </button>
-                      <button
-                        type="submit"
-                        className="btn btn-primary"
-                        disabled={saving}
-                      >
-                        {saving
-                          ? 'Zapisywanie...'
-                          : form.id == null
-                          ? 'Dodaj'
-                          : 'Zapisz zmiany'}
-                      </button>
-                    </div>
-                  </form>
-                </div>
+                    ) : (
+                      <span />
+                    )}
+
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={saving}
+                    >
+                      {saving
+                        ? 'Zapisywanie…'
+                        : editingId == null
+                        ? 'Dodaj urządzenie'
+                        : 'Zapisz zmiany'}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

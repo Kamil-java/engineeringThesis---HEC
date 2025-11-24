@@ -1,6 +1,8 @@
 package pl.bak.home_energy_controller.domain.dao;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import pl.bak.home_energy_controller.domain.model.Device;
 import pl.bak.home_energy_controller.domain.model.EnergyMeasurement;
 
@@ -14,6 +16,13 @@ public interface EnergyMeasurementRepository extends JpaRepository<EnergyMeasure
             Device device,
             Instant from,
             Instant to
+    );
+
+    @Query("select avg(em.powerW) from EnergyMeasurement em " +
+            "where em.device.id = :deviceId and em.measuredAt >= :since")
+    Double findAveragePowerWForDeviceSince(
+            @Param("deviceId") Long deviceId,
+            @Param("since") Instant since
     );
 
     Optional<EnergyMeasurement> findTopByDeviceOrderByMeasuredAtDesc(Device device);

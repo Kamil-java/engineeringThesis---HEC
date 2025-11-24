@@ -1,16 +1,19 @@
+// src/App.jsx
 import React, { useState } from 'react';
 import DeviceDashboard from './components/DeviceDashboard';
 import ManageAdditionalDevices from './components/ManageAdditionalDevices';
 import CostCalculator from './components/CostCalculator';
+import EnergyHistory from './components/EnergyHistory';
+import TariffSettings from './components/TariffSettings'; // 🔵 NOWY IMPORT
 
 function App() {
-  // 'dashboard' | 'manageAdditional' | 'costs'
+  // 'dashboard' | 'manageAdditional' | 'estimation' | 'history' | 'tariff'
   const [activeView, setActiveView] = useState('dashboard');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const handleNavClick = (view) => {
     setActiveView(view);
-    setMobileNavOpen(false); // schowaj menu po kliknięciu
+    setMobileNavOpen(false);
   };
 
   return (
@@ -51,11 +54,37 @@ function App() {
                 type="button"
                 className={
                   'nav-link btn btn-link px-0 text-decoration-none ' +
-                  (activeView === 'manageAdditional' ? 'fw-bold text-white' : 'text-light')
+                  (activeView === 'manageAdditional'
+                    ? 'fw-bold text-white'
+                    : 'text-light')
                 }
                 onClick={() => handleNavClick('manageAdditional')}
               >
                 Zarządzaj dodanymi urządzeniami
+              </button>
+            </li>
+            <li className="nav-item me-3">
+              <button
+                type="button"
+                className={
+                  'nav-link btn btn-link px-0 text-decoration-none ' +
+                  (activeView === 'estimation' ? 'fw-bold text-white' : 'text-light')
+                }
+                onClick={() => handleNavClick('estimation')}
+              >
+                Estymacja kosztów
+              </button>
+            </li>
+            <li className="nav-item me-3">
+              <button
+                type="button"
+                className={
+                  'nav-link btn btn-link px-0 text-decoration-none ' +
+                  (activeView === 'history' ? 'fw-bold text-white' : 'text-light')
+                }
+                onClick={() => handleNavClick('history')}
+              >
+                Historia kosztów
               </button>
             </li>
             <li className="nav-item">
@@ -63,11 +92,11 @@ function App() {
                 type="button"
                 className={
                   'nav-link btn btn-link px-0 text-decoration-none ' +
-                  (activeView === 'costs' ? 'fw-bold text-white' : 'text-light')
+                  (activeView === 'tariff' ? 'fw-bold text-white' : 'text-light')
                 }
-                onClick={() => handleNavClick('costs')}
+                onClick={() => handleNavClick('tariff')}
               >
-                Wyliczanie kosztów
+                Ustawienia taryfy
               </button>
             </li>
           </ul>
@@ -101,12 +130,32 @@ function App() {
             <button
               type="button"
               className={
-                'btn w-100 text-start text-light ' +
-                (activeView === 'costs' ? 'fw-bold' : '')
+                'btn w-100 text-start text-light mb-2 ' +
+                (activeView === 'estimation' ? 'fw-bold' : '')
               }
-              onClick={() => handleNavClick('costs')}
+              onClick={() => handleNavClick('estimation')}
             >
-              Wyliczanie kosztów
+              Estymacja kosztów
+            </button>
+            <button
+              type="button"
+              className={
+                'btn w-100 text-start text-light mb-2 ' +
+                (activeView === 'history' ? 'fw-bold' : '')
+              }
+              onClick={() => handleNavClick('history')}
+            >
+              Historia kosztów
+            </button>
+            <button
+              type="button"
+              className={
+                'btn w-100 text-start text-light ' +
+                (activeView === 'tariff' ? 'fw-bold' : '')
+              }
+              onClick={() => handleNavClick('tariff')}
+            >
+              Ustawienia taryfy
             </button>
           </div>
         </div>
@@ -115,7 +164,9 @@ function App() {
       {/* Główna zawartość */}
       {activeView === 'dashboard' && <DeviceDashboard />}
       {activeView === 'manageAdditional' && <ManageAdditionalDevices />}
-      {activeView === 'costs' && <CostCalculator />}
+      {activeView === 'estimation' && <CostCalculator />}
+      {activeView === 'history' && <EnergyHistory />}
+      {activeView === 'tariff' && <TariffSettings />}
     </div>
   );
 }

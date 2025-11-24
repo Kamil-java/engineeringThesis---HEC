@@ -1,10 +1,10 @@
-// frontend/src/components/CostCalculator.jsx
+// src/components/CostCalculator.jsx
 import React, { useEffect, useState } from 'react';
 import {
   fetchAllDevices,
-  fetchDeviceCurrentMonthCost,
   estimateDeviceCost,
   estimateAdditionalDeviceCost,
+  updateBulbDetails,
 } from '../api/deviceApi';
 
 function CostCalculator() {
@@ -13,409 +13,403 @@ function CostCalculator() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [infoMessage, setInfoMessage] = useState(null);
 
-  // ---- TUYA: koszty miesięczne ----
-  const [selectedTuyaIds, setSelectedTuyaIds] = useState(new Set());
-  const [calculatingTuyaIds, setCalculatingTuyaIds] = useState(new Set());
-  const [tuyaBulkLoading, setTuyaBulkLoading] = useState(false);
-  const [tuyaResults, setTuyaResults] = useState([]); // { deviceId, name, ratedPowerW, cost, energyKwh, month, year }
+  const [tuyaEstimates, setTuyaEstimates] = useState({});
+  const [additionalEstimates, setAdditionalEstimates] = useState({});
 
-  // ---- TUYA: estymacja na X godzin ----
-  const [tuyaEstimateHours, setTuyaEstimateHours] = useState('5');
-  const [tuyaEstimatingIds, setTuyaEstimatingIds] = useState(new Set());
-  const [tuyaEstimateBulkLoading, setTuyaEstimateBulkLoading] = useState(false);
-  const [tuyaEstimateResults, setTuyaEstimateResults] = useState([]); // { deviceId, name, ratedPowerW, cost, energyKwh, hours }
+  const [selectedTuyaIds, setSelectedTuyaIds] = useState([]);
+  const [selectedAdditionalIds, setSelectedAdditionalIds] = useState([]);
 
-  // ---- ADDITIONAL ----
-  const [selectedAdditionalIds, setSelectedAdditionalIds] = useState(
-    new Set()
-  );
-  const [calculatingAdditionalIds, setCalculatingAdditionalIds] = useState(
-    new Set()
-  );
-  const [additionalBulkLoading, setAdditionalBulkLoading] = useState(false);
-  const [additionalResults, setAdditionalResults] = useState([]);
-
-  // Formularz estymacji (dla additional)
-  const [estimateForm, setEstimateForm] = useState({
-    mode: 'DAYS_AVG_PER_DAY', // 'HOURS_TOTAL' | 'DAYS_AVG_PER_DAY'
-    totalHours: '',
-    days: '',
-    avgHoursPerDay: '',
+  // edycja Tuya
+  const [editingBulbDeviceId, setEditingBulbDeviceId] = useState(null);
+  const [bulbForm, setBulbForm] = useState({
+    bulbDescription: '',
+    ratedPowerW: '',
   });
+  const [savingBulb, setSavingBulb] = useState(false);
+
+  // drag & drop
+  const [dragState, setDragState] = useState(null); // { section: 'TUYA' | 'ADDITIONAL', index: number }
+
+  const loadDevices = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setInfoMessage(null);
+
+      const data = await fetchAllDevices();
+
+      const tuya = data.filter((d) => d.source === 'TUYA');
+      const additional = data.filter((d) => d.source === 'ADDITIONAL');
+
+      // odtwórz kolejność z localStorage
+      const tuyaOrder = JSON.parse(
+        localStorage.getItem('estimationTuyaOrder') || '[]'
+      );
+      const additionalOrder = JSON.parse(
+        localStorage.getItem('estimationAdditionalOrder') || '[]'
+      );
+
+      const sortByOrder = (arr, order) => {
+        if (!order || order.length === 0) return arr;
+        return [...arr].sort((a, b) => {
+          const ia = order.indexOf(a.id);
+          const ib = order.indexOf(b.id);
+          if (ia === -1 && ib === -1) return 0;
+          if (ia === -1) return 1;
+          if (ib === -1) return -1;
+          return ia - ib;
+        });
+      };
+
+      const tuyaSorted = sortByOrder(tuya, tuyaOrder);
+      const additionalSorted = sortByOrder(additional, additionalOrder);
+
+      setTuyaDevices(tuyaSorted);
+      setAdditionalDevices(additionalSorted);
+
+      // domyślne estymacje
+      const tuyaDefaults = {};
+      tuyaSorted.forEach((d) => {
+        tuyaDefaults[d.id] = {
+          hours: 24,
+          energyKwh: null,
+          cost: null,
+          ratePerKwh: null,
+          ratedPowerW: d.ratedPowerW ?? null,
+        };
+      });
+      setTuyaEstimates(tuyaDefaults);
+
+      const addDefaults = {};
+      additionalSorted.forEach((d) => {
+        addDefaults[d.id] = {
+          mode: 'HOURS',
+          hours: 24,
+          days: 1,
+          avgHoursPerDay: 1,
+          energyKwh: null,
+          cost: null,
+          ratePerKwh: null,
+          ratedPowerW: d.ratedPowerW ?? null,
+        };
+      });
+      setAdditionalEstimates(addDefaults);
+
+      setSelectedTuyaIds([]);
+      setSelectedAdditionalIds([]);
+    } catch (e) {
+      console.error(e);
+      setError('Nie udało się pobrać listy urządzeń.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function load() {
-      try {
-        setLoading(true);
-        setError(null);
-        const all = await fetchAllDevices();
-        const tuya = all.filter((d) => d.source === 'TUYA');
-        const additional = all.filter((d) => d.source === 'ADDITIONAL');
-        setTuyaDevices(tuya);
-        setAdditionalDevices(additional);
-      } catch (e) {
-        console.error(e);
-        setError('Nie udało się pobrać listy urządzeń.');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    load();
+    loadDevices();
   }, []);
 
-  // ---- TUYA: helpery (miesięczne koszty) ----
+  // ----- zaznaczanie -----
 
-  const toggleTuyaSelected = (id) => {
-    setSelectedTuyaIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+  const toggleSelectTuya = (id) => {
+    setSelectedTuyaIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAdditional = (id) => {
+    setSelectedAdditionalIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  // ----- edycja Tuya -----
+
+  const startEditBulb = (device) => {
+    setEditingBulbDeviceId(device.id);
+    setBulbForm({
+      bulbDescription: device.description || '',
+      ratedPowerW:
+        device.ratedPowerW != null ? String(device.ratedPowerW) : '',
+    });
+    setInfoMessage(null);
+    setError(null);
+  };
+
+  const cancelEditBulb = () => {
+    setEditingBulbDeviceId(null);
+    setBulbForm({
+      bulbDescription: '',
+      ratedPowerW: '',
     });
   };
 
-  const upsertTuyaResult = (entry) => {
-    setTuyaResults((prev) => {
-      const idx = prev.findIndex((r) => r.deviceId === entry.deviceId);
-      if (idx === -1) return [...prev, entry];
-      const copy = [...prev];
-      copy[idx] = entry;
-      return copy;
-    });
-  };
-
-  const handleTuyaCalculateOne = async (device) => {
-    try {
-      setCalculatingTuyaIds((prev) => new Set(prev).add(device.id));
-      const data = await fetchDeviceCurrentMonthCost(device.id);
-
-      upsertTuyaResult({
-        deviceId: device.id,
-        name: device.name || 'Bez nazwy',
-        ratedPowerW: device.ratedPowerW ?? null,
-        cost: data.cost ?? 0,
-        energyKwh: data.energyKwh ?? data.energy ?? 0,
-        month: data.month,
-        year: data.year,
-      });
-    } catch (e) {
-      console.error(e);
-      alert(
-        `Nie udało się policzyć kosztu dla urządzenia: ${
-          device.name || device.id
-        }`
-      );
-    } finally {
-      setCalculatingTuyaIds((prev) => {
-        const next = new Set(prev);
-        next.delete(device.id);
-        return next;
-      });
-    }
-  };
-
-  const tuyaCalculateForIds = async (ids) => {
-    if (!ids || ids.length === 0) return;
-    try {
-      setTuyaBulkLoading(true);
-
-      const promises = ids.map(async (id) => {
-        const device = tuyaDevices.find((d) => d.id === id);
-        if (!device) return null;
-        try {
-          const data = await fetchDeviceCurrentMonthCost(id);
-          return {
-            deviceId: id,
-            name: device.name || 'Bez nazwy',
-            ratedPowerW: device.ratedPowerW ?? null,
-            cost: data.cost ?? 0,
-            energyKwh: data.energyKwh ?? data.energy ?? 0,
-            month: data.month,
-            year: data.year,
-          };
-        } catch (e) {
-          console.error('Błąd liczenia kosztu TUYA dla id=' + id, e);
-          return null;
-        }
-      });
-
-      const resolved = await Promise.all(promises);
-      const filtered = resolved.filter((r) => r !== null);
-
-      setTuyaResults((prev) => {
-        const byId = new Map();
-        for (const r of prev) byId.set(r.deviceId, r);
-        for (const r of filtered) byId.set(r.deviceId, r);
-        return Array.from(byId.values());
-      });
-    } finally {
-      setTuyaBulkLoading(false);
-    }
-  };
-
-  const handleTuyaCalculateSelected = () => {
-    const ids = Array.from(selectedTuyaIds);
-    tuyaCalculateForIds(ids);
-  };
-
-  const handleTuyaCalculateAll = () => {
-    const ids = tuyaDevices.map((d) => d.id);
-    tuyaCalculateForIds(ids);
-  };
-
-  // ---- TUYA: helpery (estymacja na X godzin) ----
-
-  const parseTuyaHours = () => {
-    const h = parseFloat(tuyaEstimateHours);
-    if (isNaN(h) || h <= 0) {
-      alert('Podaj dodatnią liczbę godzin dla estymacji (Tuya).');
-      return null;
-    }
-    return h;
-  };
-
-  const upsertTuyaEstimateResult = (entry) => {
-    setTuyaEstimateResults((prev) => {
-      const idx = prev.findIndex((r) => r.deviceId === entry.deviceId);
-      if (idx === -1) return [...prev, entry];
-      const copy = [...prev];
-      copy[idx] = entry;
-      return copy;
-    });
-  };
-
-  const handleTuyaEstimateOne = async (device) => {
-    const hours = parseTuyaHours();
-    if (hours == null) return;
-
-    try {
-      setTuyaEstimatingIds((prev) => new Set(prev).add(device.id));
-      const data = await estimateDeviceCost(device.id, hours);
-
-      upsertTuyaEstimateResult({
-        deviceId: device.id,
-        name: device.name || 'Bez nazwy',
-        ratedPowerW: device.ratedPowerW ?? null,
-        cost: data.cost ?? 0,
-        energyKwh: data.energyKwh ?? data.energy ?? 0,
-        hours,
-      });
-    } catch (e) {
-      console.error(e);
-      alert(
-        `Nie udało się oszacować kosztu (Tuya) dla urządzenia: ${
-          device.name || device.id
-        }`
-      );
-    } finally {
-      setTuyaEstimatingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(device.id);
-        return next;
-      });
-    }
-  };
-
-  const tuyaEstimateForIds = async (ids) => {
-    if (!ids || ids.length === 0) return;
-    const hours = parseTuyaHours();
-    if (hours == null) return;
-
-    try {
-      setTuyaEstimateBulkLoading(true);
-
-      const promises = ids.map(async (id) => {
-        const device = tuyaDevices.find((d) => d.id === id);
-        if (!device) return null;
-        try {
-          const data = await estimateDeviceCost(id, hours);
-          return {
-            deviceId: id,
-            name: device.name || 'Bez nazwy',
-            ratedPowerW: device.ratedPowerW ?? null,
-            cost: data.cost ?? 0,
-            energyKwh: data.energyKwh ?? data.energy ?? 0,
-            hours,
-          };
-        } catch (e) {
-          console.error('Błąd estymacji kosztu (Tuya) dla id=' + id, e);
-          return null;
-        }
-      });
-
-      const resolved = await Promise.all(promises);
-      const filtered = resolved.filter((r) => r !== null);
-
-      setTuyaEstimateResults((prev) => {
-        const byId = new Map();
-        for (const r of prev) byId.set(r.deviceId, r);
-        for (const r of filtered) byId.set(r.deviceId, r);
-        return Array.from(byId.values());
-      });
-    } finally {
-      setTuyaEstimateBulkLoading(false);
-    }
-  };
-
-  const handleTuyaEstimateSelected = () => {
-    const ids = Array.from(selectedTuyaIds);
-    tuyaEstimateForIds(ids);
-  };
-
-  const handleTuyaEstimateAll = () => {
-    const ids = tuyaDevices.map((d) => d.id);
-    tuyaEstimateForIds(ids);
-  };
-
-  // ---- ADDITIONAL: helpery ----
-
-  const toggleAdditionalSelected = (id) => {
-    setSelectedAdditionalIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const upsertAdditionalResult = (entry) => {
-    setAdditionalResults((prev) => {
-      const idx = prev.findIndex((r) => r.deviceId === entry.deviceId);
-      if (idx === -1) return [...prev, entry];
-      const copy = [...prev];
-      copy[idx] = entry;
-      return copy;
-    });
-  };
-
-  const handleEstimateFormChange = (e) => {
+  const handleBulbFormChange = (e) => {
     const { name, value } = e.target;
-    setEstimateForm((prev) => ({
+    setBulbForm((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  /**
-   * Buduje obiekt params dla GET /additional-device/{id}/estimate:
-   *  - HOURS_TOTAL -> { hours: ... }
-   *  - DAYS_AVG_PER_DAY -> { days: ..., avgHoursPerDay: ... }
-   */
-  const buildEstimateQuery = () => {
-    const mode = estimateForm.mode;
-    if (mode === 'HOURS_TOTAL') {
-      const hours = parseFloat(estimateForm.totalHours);
-      if (isNaN(hours) || hours <= 0) {
-        alert('Podaj dodatnią liczbę godzin (całkowity czas pracy).');
-        return null;
-      }
-      return { hours };
-    } else {
-      const days = parseInt(estimateForm.days, 10);
-      const avgHoursPerDay = parseFloat(estimateForm.avgHoursPerDay);
-      if (isNaN(days) || days <= 0) {
-        alert('Podaj dodatnią liczbę dni.');
-        return null;
-      }
-      if (isNaN(avgHoursPerDay) || avgHoursPerDay <= 0) {
-        alert('Podaj dodatnią liczbę godzin na dzień.');
-        return null;
-      }
-      return { days, avgHoursPerDay };
-    }
-  };
+  const saveBulbDetails = async () => {
+    if (!editingBulbDeviceId) return;
 
-  const handleAdditionalEstimateOne = async (device) => {
-    const query = buildEstimateQuery();
-    if (!query) return;
+    const payload = {};
+    if (bulbForm.bulbDescription.trim() !== '') {
+      payload.bulbDescription = bulbForm.bulbDescription.trim();
+    } else {
+      payload.bulbDescription = null;
+    }
+
+    if (bulbForm.ratedPowerW.trim() !== '') {
+      const parsed = parseFloat(bulbForm.ratedPowerW);
+      if (isNaN(parsed) || parsed <= 0) {
+        alert('Podaj dodatnią wartość mocy w watach (W).');
+        return;
+      }
+      payload.ratedPowerW = parsed;
+    } else {
+      payload.ratedPowerW = null;
+    }
 
     try {
-      setCalculatingAdditionalIds((prev) => new Set(prev).add(device.id));
-      const data = await estimateAdditionalDeviceCost(device.id, query);
+      setSavingBulb(true);
+      setError(null);
+      setInfoMessage(null);
 
-      upsertAdditionalResult({
-        deviceId: device.id,
-        name: device.name || 'Bez nazwy',
-        ratedPowerW: device.ratedPowerW ?? null,
-        cost: data.cost ?? 0,
-        energyKwh: data.energyKwh ?? data.energy ?? 0,
-        mode: estimateForm.mode,
-        extra: data,
-      });
+      await updateBulbDetails(editingBulbDeviceId, payload);
+
+      await loadDevices();
+
+      setInfoMessage('Dane urządzenia Tuya zostały zaktualizowane.');
+      cancelEditBulb();
     } catch (e) {
       console.error(e);
-      alert(
-        `Nie udało się oszacować kosztu dla urządzenia: ${
-          device.name || device.id
-        }`
-      );
+      setError('Nie udało się zaktualizować danych urządzenia Tuya.');
     } finally {
-      setCalculatingAdditionalIds((prev) => {
-        const next = new Set(prev);
-        next.delete(device.id);
-        return next;
-      });
+      setSavingBulb(false);
     }
   };
 
-  const additionalEstimateForIds = async (ids) => {
-    if (!ids || ids.length === 0) return;
-    const query = buildEstimateQuery();
-    if (!query) return;
+  // ----- estymacja TUYA -----
 
+  const handleTuyaHoursChange = (deviceId, value) => {
+    setTuyaEstimates((prev) => ({
+      ...prev,
+      [deviceId]: {
+        ...(prev[deviceId] || {}),
+        hours: value,
+      },
+    }));
+  };
+
+  const estimateTuyaSingle = async (deviceId) => {
     try {
-      setAdditionalBulkLoading(true);
+      setError(null);
+      setInfoMessage(null);
 
-      const promises = ids.map(async (id) => {
-        const device = additionalDevices.find((d) => d.id === id);
-        if (!device) return null;
-        try {
-          const data = await estimateAdditionalDeviceCost(id, query);
-          return {
-            deviceId: id,
-            name: device.name || 'Bez nazwy',
-            ratedPowerW: device.ratedPowerW ?? null,
-            cost: data.cost ?? 0,
-            energyKwh: data.energyKwh ?? data.energy ?? 0,
-            mode: estimateForm.mode,
-            extra: data,
-          };
-        } catch (e) {
-          console.error(
-            'Błąd estymacji kosztu dla additional id=' + id,
-            e
-          );
-          return null;
-        }
-      });
+      const current = tuyaEstimates[deviceId] || { hours: 24 };
+      const hoursNum = parseFloat(current.hours);
 
-      const resolved = await Promise.all(promises);
-      const filtered = resolved.filter((r) => r !== null);
+      if (isNaN(hoursNum) || hoursNum <= 0) {
+        alert('Podaj dodatnią liczbę godzin.');
+        return;
+      }
 
-      setAdditionalResults((prev) => {
-        const byId = new Map();
-        for (const r of prev) byId.set(r.deviceId, r);
-        for (const r of filtered) byId.set(r.deviceId, r);
-        return Array.from(byId.values());
-      });
-    } finally {
-      setAdditionalBulkLoading(false);
+      const data = await estimateDeviceCost(deviceId, hoursNum);
+
+      setTuyaEstimates((prev) => ({
+        ...prev,
+        [deviceId]: {
+          ...(prev[deviceId] || {}),
+          hours: hoursNum,
+          energyKwh: Number(data.energyKwh ?? data.energy ?? 0),
+          cost: Number(data.cost ?? 0),
+          ratePerKwh: Number(data.ratePerKwh ?? data.rate ?? 0),
+          ratedPowerW:
+            data.ratedPowerW != null
+              ? Number(data.ratedPowerW)
+              : prev[deviceId]?.ratedPowerW ?? null,
+        },
+      }));
+    } catch (e) {
+      console.error(e);
+      setError('Nie udało się obliczyć estymacji dla urządzenia Tuya.');
     }
   };
 
-  const handleAdditionalEstimateSelected = () => {
-    const ids = Array.from(selectedAdditionalIds);
-    additionalEstimateForIds(ids);
+  // ----- estymacja ADDITIONAL -----
+
+  const handleAdditionalModeChange = (deviceId, mode) => {
+    setAdditionalEstimates((prev) => ({
+      ...prev,
+      [deviceId]: {
+        ...(prev[deviceId] || {}),
+        mode,
+      },
+    }));
   };
 
-  const handleAdditionalEstimateAll = () => {
-    const ids = additionalDevices.map((d) => d.id);
-    additionalEstimateForIds(ids);
+  const handleAdditionalFieldChange = (deviceId, field, value) => {
+    setAdditionalEstimates((prev) => ({
+      ...prev,
+      [deviceId]: {
+        ...(prev[deviceId] || {}),
+        [field]: value,
+      },
+    }));
   };
 
-  // ---- RENDER ----
+  const estimateAdditionalSingle = async (deviceId) => {
+    try {
+      setError(null);
+      setInfoMessage(null);
+
+      const current = additionalEstimates[deviceId] || {
+        mode: 'HOURS',
+        hours: 24,
+        days: 1,
+        avgHoursPerDay: 1,
+      };
+
+      const params = {};
+      if (current.mode === 'HOURS') {
+        const h = parseFloat(current.hours);
+        if (isNaN(h) || h <= 0) {
+          alert('Podaj dodatnią liczbę godzin.');
+          return;
+        }
+        params.hours = h;
+      } else {
+        const d = parseInt(current.days, 10);
+        const avg = parseFloat(current.avgHoursPerDay);
+        if (isNaN(d) || d <= 0 || isNaN(avg) || avg <= 0) {
+          alert('Podaj dodatnie wartości dni i średnich godzin.');
+          return;
+        }
+        params.days = d;
+        params.avgHoursPerDay = avg;
+      }
+
+      const data = await estimateAdditionalDeviceCost(deviceId, params);
+
+      setAdditionalEstimates((prev) => ({
+        ...prev,
+        [deviceId]: {
+          ...(prev[deviceId] || {}),
+          energyKwh: Number(data.energyKwh ?? 0),
+          cost: Number(data.cost ?? 0),
+          ratePerKwh: Number(data.ratePerKwh ?? data.rate ?? 0),
+          ratedPowerW:
+            data.ratedPowerW != null
+              ? Number(data.ratedPowerW)
+              : prev[deviceId]?.ratedPowerW ?? null,
+        },
+      }));
+    } catch (e) {
+      console.error(e);
+      setError(
+        'Nie udało się obliczyć estymacji dla urządzenia dodanego ręcznie.'
+      );
+    }
+  };
+
+  // ----- estymacja zbiorcza -----
+
+  const estimateSelected = async () => {
+    try {
+      setError(null);
+      setInfoMessage(null);
+
+      for (const id of selectedTuyaIds) {
+        // eslint-disable-next-line no-await-in-loop
+        await estimateTuyaSingle(id);
+      }
+
+      for (const id of selectedAdditionalIds) {
+        // eslint-disable-next-line no-await-in-loop
+        await estimateAdditionalSingle(id);
+      }
+
+      setInfoMessage('Wyliczono koszt dla zaznaczonych urządzeń.');
+    } catch (e) {
+      console.error(e);
+      setError('Wystąpił błąd podczas wyliczania dla zaznaczonych.');
+    }
+  };
+
+  const estimateAll = async () => {
+    try {
+      setError(null);
+      setInfoMessage(null);
+
+      for (const d of tuyaDevices) {
+        // eslint-disable-next-line no-await-in-loop
+        await estimateTuyaSingle(d.id);
+      }
+
+      for (const d of additionalDevices) {
+        // eslint-disable-next-line no-await-in-loop
+        await estimateAdditionalSingle(d.id);
+      }
+
+      setInfoMessage('Wyliczono koszt dla wszystkich urządzeń.');
+    } catch (e) {
+      console.error(e);
+      setError('Wystąpił błąd podczas wyliczania dla wszystkich urządzeń.');
+    }
+  };
+
+  // ----- DRAG & DROP -----
+
+  const handleDragStart = (section, index) => {
+    setDragState({ section, index });
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (section, dropIndex) => {
+    if (!dragState || dragState.section !== section) return;
+
+    if (section === 'TUYA') {
+      setTuyaDevices((prev) => {
+        const arr = [...prev];
+        const draggedItem = arr[dragState.index];
+        arr.splice(dragState.index, 1);
+        arr.splice(dropIndex, 0, draggedItem);
+        localStorage.setItem(
+          'estimationTuyaOrder',
+          JSON.stringify(arr.map((d) => d.id))
+        );
+        return arr;
+      });
+    } else if (section === 'ADDITIONAL') {
+      setAdditionalDevices((prev) => {
+        const arr = [...prev];
+        const draggedItem = arr[dragState.index];
+        arr.splice(dragState.index, 1);
+        arr.splice(dropIndex, 0, draggedItem);
+        localStorage.setItem(
+          'estimationAdditionalOrder',
+          JSON.stringify(arr.map((d) => d.id))
+        );
+        return arr;
+      });
+    }
+
+    setDragState(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragState(null);
+  };
+
+  // ----- render -----
 
   if (loading) {
     return (
@@ -427,182 +421,288 @@ function CostCalculator() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-light min-vh-100">
-        <div className="pb-5 pt-3 px-3 px-md-4 px-lg-5">
-          <div className="alert alert-danger mt-3">{error}</div>
-        </div>
-      </div>
-    );
-  }
-
-  const anyTuyaSelected = selectedTuyaIds.size > 0;
-  const anyAdditionalSelected = selectedAdditionalIds.size > 0;
-
   return (
     <div className="bg-light min-vh-100">
       <div className="pb-5 pt-3 px-3 px-md-4 px-lg-5">
-        <div className="row mb-4">
-          <div className="col-12">
-            <h2 className="mb-1">Wyliczanie kosztów energii</h2>
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+          <div>
+            <h2 className="mb-1">Estymacja kosztów energii</h2>
             <p className="text-muted mb-0">
-              Urządzenia Tuya – koszt na podstawie pomiarów lub estymacja na X
-              godzin. Urządzenia dodane ręcznie – szacowanie kosztu na podstawie
-              mocy i czasu pracy.
+              Przeciągaj kafelki, aby ustawić własną kolejność. Zaznacz
+              urządzenia checkboxami, aby policzyć wspólnie, lub wylicz koszt
+              pojedynczego kafelka.
             </p>
+          </div>
+
+          <div className="d-flex flex-column flex-sm-row gap-2">
+            <button
+              type="button"
+              className="btn btn-outline-primary"
+              onClick={estimateSelected}
+              disabled={
+                selectedTuyaIds.length === 0 &&
+                selectedAdditionalIds.length === 0
+              }
+            >
+              Wylicz koszt zaznaczonych
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={estimateAll}
+              disabled={
+                tuyaDevices.length === 0 && additionalDevices.length === 0
+              }
+            >
+              Wylicz koszt wszystkich
+            </button>
           </div>
         </div>
 
-        {/* ---- SEKCJA TUYA ---- */}
-        <section className="mb-5">
-          <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-3">
-            <div>
-              <h4 className="mb-0">Urządzenia Tuya</h4>
-              <small className="text-muted">
-                Rzeczywisty koszt za bieżący miesiąc oraz estymacja na
-                zadany czas pracy (w godzinach).
-              </small>
-            </div>
-
-            <div className="d-flex flex-column flex-md-row align-items-md-center gap-2">
-              <div className="d-flex align-items-center gap-2">
-                <label className="form-label mb-0 small">
-                  Godziny do estymacji:
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  className="form-control form-control-sm"
-                  style={{ width: '80px' }}
-                  value={tuyaEstimateHours}
-                  onChange={(e) => setTuyaEstimateHours(e.target.value)}
-                />
-              </div>
-              <div className="d-flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="btn btn-outline-primary btn-sm"
-                  onClick={handleTuyaCalculateAll}
-                  disabled={tuyaBulkLoading || tuyaDevices.length === 0}
-                >
-                  {tuyaBulkLoading ? 'Liczenie…' : 'Koszt miesiąca wszystkich'}
-                </button>
-
-                {anyTuyaSelected && (
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={handleTuyaCalculateSelected}
-                    disabled={tuyaBulkLoading}
-                  >
-                    {tuyaBulkLoading
-                      ? 'Liczenie…'
-                      : 'Koszt miesiąca zaznaczonych'}
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  className="btn btn-outline-success btn-sm"
-                  onClick={handleTuyaEstimateAll}
-                  disabled={
-                    tuyaEstimateBulkLoading || tuyaDevices.length === 0
-                  }
-                >
-                  {tuyaEstimateBulkLoading
-                    ? 'Szacowanie…'
-                    : `Oszacuj ${tuyaEstimateHours || '?'} h (wszyscy)`}
-                </button>
-
-                {anyTuyaSelected && (
-                  <button
-                    type="button"
-                    className="btn btn-success btn-sm"
-                    onClick={handleTuyaEstimateSelected}
-                    disabled={tuyaEstimateBulkLoading}
-                  >
-                    {tuyaEstimateBulkLoading
-                      ? 'Szacowanie…'
-                      : `Oszacuj ${tuyaEstimateHours || '?'} h (zaznaczeni)`}
-                  </button>
-                )}
-
-                {anyTuyaSelected && (
-                  <span className="text-muted small">
-                    Zaznaczono: {selectedTuyaIds.size}
-                  </span>
-                )}
-              </div>
-            </div>
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            {error}
           </div>
+        )}
+        {infoMessage && (
+          <div className="alert alert-success" role="alert">
+            {infoMessage}
+          </div>
+        )}
 
+        <div className="mb-3 small text-muted">
+          Zaznaczone: TUYA {selectedTuyaIds.length}, ADDITIONAL{' '}
+          {selectedAdditionalIds.length}
+        </div>
+
+        {/* --- TUYA --- */}
+        <section className="mb-5">
+          <h4 className="mb-3">Urządzenia Tuya</h4>
           {tuyaDevices.length === 0 ? (
             <p className="text-muted">
-              Brak urządzeń Tuya. Zsynchronizuj je najpierw w systemie.
+              Brak urządzeń Tuya. Sprawdź integrację z backendem.
             </p>
           ) : (
             <div className="row g-3">
-              {tuyaDevices.map((device) => {
-                const isSelected = selectedTuyaIds.has(device.id);
-                const isCalculatingMonth = calculatingTuyaIds.has(device.id);
-                const isEstimatingHours = tuyaEstimatingIds.has(device.id);
-                const ratedPower =
-                  device.ratedPowerW != null
-                    ? `${device.ratedPowerW} W`
-                    : 'brak danych';
+              {tuyaDevices.map((device, index) => {
+                const est = tuyaEstimates[device.id] || {};
+                const isEditing = editingBulbDeviceId === device.id;
+                const selected = selectedTuyaIds.includes(device.id);
+                const isDragging =
+                  dragState &&
+                  dragState.section === 'TUYA' &&
+                  dragState.index === index;
+
+                const category = device.category || '-';
+                let deviceKindLabel = 'Urządzenie';
+                let descriptionLabel = 'Opis urządzenia';
+                if (category === 'cz') {
+                  deviceKindLabel = 'Gniazdko';
+                  descriptionLabel = 'Opis gniazdka';
+                } else if (category === 'qt') {
+                  deviceKindLabel = 'Czujnik';
+                  descriptionLabel = 'Opis czujnika';
+                } else if (category === 'dj') {
+                  deviceKindLabel = 'Oświetlenie';
+                  descriptionLabel = 'Opis lampy';
+                }
 
                 return (
                   <div
                     key={device.id}
                     className="col-12 col-sm-6 col-md-4 col-lg-3"
+                    onDragOver={handleDragOver}
+                    onDrop={() => handleDrop('TUYA', index)}
                   >
-                    <div className="card shadow-sm h-100">
-                      <div className="card-body d-flex flex-column">
-                        <div className="d-flex justify-content-between align-items-start mb-2">
+                    <div
+                      className={
+                        'card shadow-sm h-100 card-hover card-draggable ' +
+                        (isDragging ? 'card-dragging' : '')
+                      }
+                      draggable
+                      onDragStart={() => handleDragStart('TUYA', index)}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <div className="card-header d-flex justify-content-between align-items-center bg-gradient-primary text-white py-2">
+                        <div className="d-flex align-items-center gap-2">
+                          <input
+                            type="checkbox"
+                            className="form-check-input mt-0"
+                            checked={selected}
+                            onChange={() => toggleSelectTuya(device.id)}
+                          />
+                          <span
+                            className="drag-handle"
+                            title="Przeciągnij, aby zmienić kolejność"
+                          >
+                            ☰
+                          </span>
                           <div>
-                            <h6 className="card-title mb-1">
+                            <div className="fw-semibold text-truncate">
                               {device.name || 'Bez nazwy'}
-                            </h6>
-                            <p className="card-text text-muted small mb-0">
-                              Moc: <strong>{ratedPower}</strong>
-                            </p>
-                          </div>
-                          <div className="form-check ms-2">
-                            <input
-                              className="form-check-input"
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleTuyaSelected(device.id)}
-                            />
+                            </div>
+                            <small className="opacity-75">
+                              {deviceKindLabel} ({category})
+                            </small>
                           </div>
                         </div>
+                        <span
+                          className={
+                            'badge ' +
+                            (device.online ? 'bg-success' : 'bg-secondary')
+                          }
+                        >
+                          {device.online ? 'Online' : 'Offline'}
+                        </span>
+                      </div>
 
-                        <div className="mt-auto d-flex flex-column gap-2">
+                      <div className="card-body d-flex flex-column">
+                        <p className="card-text text-muted small mb-1">
+                          Źródło: <strong>Tuya</strong>
+                        </p>
+
+                        <p className="card-text text-muted small mb-1">
+                          Moc znamionowa:{' '}
+                          <strong>
+                            {device.ratedPowerW != null
+                              ? `${device.ratedPowerW} W`
+                              : 'nie ustawiono'}
+                          </strong>
+                        </p>
+
+                        <p className="card-text text-muted small mb-2">
+                          {descriptionLabel}:{' '}
+                          <strong>
+                            {device.description
+                              ? device.description
+                              : 'brak opisu'}
+                          </strong>
+                        </p>
+
+                        {isEditing && (
+                          <div className="mt-2 p-2 border rounded bg-light-subtle">
+                            <h6 className="small fw-semibold mb-2">
+                              Edytuj parametry (
+                              {deviceKindLabel.toLowerCase()})
+                            </h6>
+
+                            <div className="mb-2">
+                              <label className="form-label small mb-1">
+                                {descriptionLabel}
+                              </label>
+                              <textarea
+                                className="form-control form-control-sm"
+                                rows={2}
+                                name="bulbDescription"
+                                value={bulbForm.bulbDescription}
+                                onChange={handleBulbFormChange}
+                              />
+                            </div>
+
+                            <div className="mb-2">
+                              <label className="form-label small mb-1">
+                                Moc znamionowa [W]
+                              </label>
+                              <input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                className="form-control form-control-sm"
+                                name="ratedPowerW"
+                                value={bulbForm.ratedPowerW}
+                                onChange={handleBulbFormChange}
+                                placeholder="np. 8, 35, 120"
+                              />
+                            </div>
+
+                            <div className="d-flex justify-content-end gap-2 mt-2">
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                onClick={cancelEditBulb}
+                                disabled={savingBulb}
+                              >
+                                Anuluj
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-primary"
+                                onClick={saveBulbDetails}
+                                disabled={savingBulb}
+                              >
+                                {savingBulb ? 'Zapisywanie…' : 'Zapisz'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="mt-3">
+                          <h6 className="small fw-semibold mb-2">
+                            Estymacja kosztu
+                          </h6>
+                          <div className="mb-2">
+                            <label className="form-label small mb-1">
+                              Godziny pracy
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              className="form-control form-control-sm"
+                              value={est.hours ?? ''}
+                              onChange={(e) =>
+                                handleTuyaHoursChange(
+                                  device.id,
+                                  e.target.value
+                                )
+                              }
+                              placeholder="np. 24"
+                            />
+                          </div>
                           <button
                             type="button"
                             className="btn btn-sm btn-outline-primary w-100"
-                            onClick={() => handleTuyaCalculateOne(device)}
-                            disabled={isCalculatingMonth || tuyaBulkLoading}
+                            onClick={() => estimateTuyaSingle(device.id)}
                           >
-                            {isCalculatingMonth
-                              ? 'Liczenie…'
-                              : 'Koszt bieżącego miesiąca'}
+                            Wylicz koszt
                           </button>
 
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-success w-100"
-                            onClick={() => handleTuyaEstimateOne(device)}
-                            disabled={
-                              isEstimatingHours || tuyaEstimateBulkLoading
-                            }
-                          >
-                            {isEstimatingHours
-                              ? 'Szacowanie…'
-                              : `Oszacuj ${tuyaEstimateHours || '?'} h`}
-                          </button>
+                          {est.energyKwh != null && (
+                            <div className="mt-2 small text-muted">
+                              <div>
+                                Energia:{' '}
+                                <strong>
+                                  {est.energyKwh.toFixed(3)} kWh
+                                </strong>
+                              </div>
+                              <div>
+                                Koszt:{' '}
+                                <strong>{est.cost.toFixed(2)} zł</strong>
+                              </div>
+                              {est.ratePerKwh != null && (
+                                <div>
+                                  Stawka:{' '}
+                                  <strong>
+                                    {est.ratePerKwh.toFixed(2)} zł/kWh
+                                  </strong>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
+
+                        {!isEditing && (
+                          <div className="mt-auto pt-2 d-grid">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-secondary"
+                              onClick={() => startEditBulb(device)}
+                            >
+                              Edytuj parametry{' '}
+                              {deviceKindLabel.toLowerCase()}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -610,254 +710,237 @@ function CostCalculator() {
               })}
             </div>
           )}
-
-          {/* Raport TUYA – miesiąc */}
-          <div className="mt-4">
-            <h5 className="mb-3">Raport (Tuya – bieżący miesiąc)</h5>
-            {tuyaResults.length === 0 ? (
-              <p className="text-muted">
-                Brak wyników. Użyj przycisków „Koszt miesiąca…”.
-              </p>
-            ) : (
-              <div className="table-responsive">
-                <table className="table table-striped align-middle">
-                  <thead>
-                    <tr>
-                      <th>Urządzenie</th>
-                      <th>Moc [W]</th>
-                      <th>Energia [kWh]</th>
-                      <th>Koszt</th>
-                      <th>Miesiąc</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tuyaResults.map((r) => (
-                      <tr key={r.deviceId}>
-                        <td>{r.name}</td>
-                        <td>{r.ratedPowerW != null ? r.ratedPowerW : '-'}</td>
-                        <td>
-                          {r.energyKwh != null ? r.energyKwh.toFixed(3) : '-'}
-                        </td>
-                        <td>
-                          {r.cost != null ? r.cost.toFixed(2) + ' zł' : '-'}
-                        </td>
-                        <td>
-                          {r.month != null && r.year != null
-                            ? `${r.month}.${r.year}`
-                            : '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Raport TUYA – estymacja godzinowa */}
-          <div className="mt-4">
-            <h5 className="mb-3">Raport (Tuya – estymacja na X godzin)</h5>
-            {tuyaEstimateResults.length === 0 ? (
-              <p className="text-muted">
-                Brak wyników. Użyj przycisków „Oszacuj … h”.
-              </p>
-            ) : (
-              <div className="table-responsive">
-                <table className="table table-striped align-middle">
-                  <thead>
-                    <tr>
-                      <th>Urządzenie</th>
-                      <th>Moc [W]</th>
-                      <th>Godzin</th>
-                      <th>Energia [kWh]</th>
-                      <th>Koszt</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tuyaEstimateResults.map((r) => (
-                      <tr key={r.deviceId}>
-                        <td>{r.name}</td>
-                        <td>{r.ratedPowerW != null ? r.ratedPowerW : '-'}</td>
-                        <td>{r.hours != null ? r.hours : '-'}</td>
-                        <td>
-                          {r.energyKwh != null ? r.energyKwh.toFixed(3) : '-'}
-                        </td>
-                        <td>
-                          {r.cost != null ? r.cost.toFixed(2) + ' zł' : '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
         </section>
 
-        {/* ---- SEKCJA ADDITIONAL ---- (bez zmian logiki, tylko poniżej) */}
+        {/* --- ADDITIONAL --- */}
         <section>
-          <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-            <div>
-              <h4 className="mb-0">Urządzenia dodane ręcznie</h4>
-              <small className="text-muted">
-                Szacowanie kosztu na podstawie mocy i założonego czasu pracy.
-              </small>
-            </div>
-          </div>
-
-          {/* Formularz estymacji */}
-          <div className="card mb-3">
-            <div className="card-body">
-              <h6 className="card-title mb-3">Parametry estymacji</h6>
-              <div className="row g-3 align-items-end">
-                <div className="col-12 col-md-4">
-                  <label className="form-label">Tryb</label>
-                  <select
-                    className="form-select"
-                    name="mode"
-                    value={estimateForm.mode}
-                    onChange={handleEstimateFormChange}
-                  >
-                    <option value="DAYS_AVG_PER_DAY">
-                      Dni + średnie godziny dziennie
-                    </option>
-                    <option value="HOURS_TOTAL">Całkowita liczba godzin</option>
-                  </select>
-                </div>
-
-                {estimateForm.mode === 'HOURS_TOTAL' ? (
-                  <div className="col-12 col-md-4">
-                    <label className="form-label">Liczba godzin</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      className="form-control"
-                      name="totalHours"
-                      value={estimateForm.totalHours}
-                      onChange={handleEstimateFormChange}
-                      placeholder="np. 120"
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <div className="col-12 col-md-3">
-                      <label className="form-label">Liczba dni</label>
-                      <input
-                        type="number"
-                        className="form-control"
-                        name="days"
-                        value={estimateForm.days}
-                        onChange={handleEstimateFormChange}
-                        placeholder="np. 30"
-                      />
-                    </div>
-                    <div className="col-12 col-md-3">
-                      <label className="form-label">
-                        Średnio godzin dziennie
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        className="form-control"
-                        name="avgHoursPerDay"
-                        value={estimateForm.avgHoursPerDay}
-                        onChange={handleEstimateFormChange}
-                        placeholder="np. 4"
-                      />
-                    </div>
-                  </>
-                )}
-
-                <div className="col-12 col-md-5 col-lg-4 d-flex flex-wrap gap-2 mt-2 mt-md-0">
-                  <button
-                    type="button"
-                    className="btn btn-outline-primary"
-                    onClick={handleAdditionalEstimateAll}
-                    disabled={
-                      additionalBulkLoading || additionalDevices.length === 0
-                    }
-                  >
-                    {additionalBulkLoading
-                      ? 'Szacowanie…'
-                      : 'Oszacuj koszt wszystkich'}
-                  </button>
-
-                  {anyAdditionalSelected && (
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={handleAdditionalEstimateSelected}
-                      disabled={additionalBulkLoading}
-                    >
-                      {additionalBulkLoading
-                        ? 'Szacowanie…'
-                        : 'Oszacuj koszt zaznaczonych'}
-                    </button>
-                  )}
-
-                  {anyAdditionalSelected && (
-                    <span className="text-muted small align-self-center">
-                      Zaznaczono: {selectedAdditionalIds.size}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Kafelki ADDITIONAL */}
+          <h4 className="mb-3">Urządzenia dodane ręcznie</h4>
           {additionalDevices.length === 0 ? (
             <p className="text-muted">
-              Brak urządzeń dodanych ręcznie. Dodaj je w sekcji „Zarządzaj
-              dodanymi urządzeniami”.
+              Brak urządzeń dodanych ręcznie. Dodaj je w sekcji zarządzania
+              urządzeniami.
             </p>
           ) : (
             <div className="row g-3">
-              {additionalDevices.map((device) => {
-                const isSelected = selectedAdditionalIds.has(device.id);
-                const isCalculating = calculatingAdditionalIds.has(device.id);
-                const ratedPower =
-                  device.ratedPowerW != null
-                    ? `${device.ratedPowerW} W`
-                    : 'brak danych';
+              {additionalDevices.map((device, index) => {
+                const est = additionalEstimates[device.id] || {
+                  mode: 'HOURS',
+                  hours: 24,
+                  days: 1,
+                  avgHoursPerDay: 1,
+                };
+                const selected = selectedAdditionalIds.includes(device.id);
+                const isDragging =
+                  dragState &&
+                  dragState.section === 'ADDITIONAL' &&
+                  dragState.index === index;
 
                 return (
                   <div
                     key={device.id}
                     className="col-12 col-sm-6 col-md-4 col-lg-3"
+                    onDragOver={handleDragOver}
+                    onDrop={() => handleDrop('ADDITIONAL', index)}
                   >
-                    <div className="card shadow-sm h-100">
-                      <div className="card-body d-flex flex-column">
-                        <div className="d-flex justify-content-between align-items-start mb-2">
+                    <div
+                      className={
+                        'card shadow-sm h-100 card-hover card-draggable ' +
+                        (isDragging ? 'card-dragging' : '')
+                      }
+                      draggable
+                      onDragStart={() => handleDragStart('ADDITIONAL', index)}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <div className="card-header d-flex justify-content-between align-items-center bg-gradient-secondary text-white py-2">
+                        <div className="d-flex align-items-center gap-2">
+                          <input
+                            type="checkbox"
+                            className="form-check-input mt-0"
+                            checked={selected}
+                            onChange={() =>
+                              toggleSelectAdditional(device.id)
+                            }
+                          />
+                          <span
+                            className="drag-handle"
+                            title="Przeciągnij, aby zmienić kolejność"
+                          >
+                            ☰
+                          </span>
                           <div>
-                            <h6 className="card-title mb-1">
+                            <div className="fw-semibold text-truncate">
                               {device.name || 'Bez nazwy'}
-                            </h6>
-                            <p className="card-text text-muted small mb-0">
-                              Moc: <strong>{ratedPower}</strong>
-                            </p>
-                          </div>
-                          <div className="form-check ms-2">
-                            <input
-                              className="form-check-input"
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() =>
-                                toggleAdditionalSelected(device.id)
-                              }
-                            />
+                            </div>
+                            <small className="opacity-75">
+                              Kategoria: {device.category || '-'}
+                            </small>
                           </div>
                         </div>
+                        <span className="badge bg-info text-dark">
+                          ADDITIONAL
+                        </span>
+                      </div>
 
-                        <div className="mt-auto">
+                      <div className="card-body d-flex flex-column">
+                        {device.ratedPowerW != null && (
+                          <p className="card-text text-muted small mb-1">
+                            Moc znamionowa:{' '}
+                            <strong>{device.ratedPowerW} W</strong>
+                          </p>
+                        )}
+
+                        {device.description && (
+                          <p className="card-text text-muted small mb-2">
+                            {device.description}
+                          </p>
+                        )}
+
+                        <div className="mt-2">
+                          <h6 className="small fw-semibold mb-2">
+                            Estymacja kosztu
+                          </h6>
+
+                          <div className="mb-2">
+                            <div className="form-check form-check-inline">
+                              <input
+                                className="form-check-input"
+                                type="radio"
+                                name={`mode-${device.id}`}
+                                id={`mode-hours-${device.id}`}
+                                checked={est.mode === 'HOURS'}
+                                onChange={() =>
+                                  handleAdditionalModeChange(
+                                    device.id,
+                                    'HOURS'
+                                  )
+                                }
+                              />
+                              <label
+                                className="form-check-label small"
+                                htmlFor={`mode-hours-${device.id}`}
+                              >
+                                Łączna liczba godzin
+                              </label>
+                            </div>
+                            <div className="form-check form-check-inline">
+                              <input
+                                className="form-check-input"
+                                type="radio"
+                                name={`mode-${device.id}`}
+                                id={`mode-days-${device.id}`}
+                                checked={est.mode === 'DAYS_AVG'}
+                                onChange={() =>
+                                  handleAdditionalModeChange(
+                                    device.id,
+                                    'DAYS_AVG'
+                                  )
+                                }
+                              />
+                              <label
+                                className="form-check-label small"
+                                htmlFor={`mode-days-${device.id}`}
+                              >
+                                Dni × średnie godziny/dzień
+                              </label>
+                            </div>
+                          </div>
+
+                          {est.mode === 'HOURS' ? (
+                            <div className="mb-2">
+                              <label className="form-label small mb-1">
+                                Godziny (łącznie)
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                className="form-control form-control-sm"
+                                value={est.hours ?? ''}
+                                onChange={(e) =>
+                                  handleAdditionalFieldChange(
+                                    device.id,
+                                    'hours',
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="np. 24"
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <div className="mb-2">
+                                <label className="form-label small mb-1">
+                                  Liczba dni
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  step="1"
+                                  className="form-control form-control-sm"
+                                  value={est.days ?? ''}
+                                  onChange={(e) =>
+                                    handleAdditionalFieldChange(
+                                      device.id,
+                                      'days',
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="np. 30"
+                                />
+                              </div>
+                              <div className="mb-2">
+                                <label className="form-label small mb-1">
+                                  Średnie godziny/dzień
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.5"
+                                  className="form-control form-control-sm"
+                                  value={est.avgHoursPerDay ?? ''}
+                                  onChange={(e) =>
+                                    handleAdditionalFieldChange(
+                                      device.id,
+                                      'avgHoursPerDay',
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="np. 5"
+                                />
+                              </div>
+                            </>
+                          )}
+
                           <button
                             type="button"
                             className="btn btn-sm btn-outline-primary w-100"
-                            onClick={() => handleAdditionalEstimateOne(device)}
-                            disabled={isCalculating || additionalBulkLoading}
+                            onClick={() => estimateAdditionalSingle(device.id)}
                           >
-                            {isCalculating ? 'Szacowanie…' : 'Oszacuj koszt'}
+                            Wylicz koszt
                           </button>
+
+                          {est.energyKwh != null && (
+                            <div className="mt-2 small text-muted">
+                              <div>
+                                Energia:{' '}
+                                <strong>
+                                  {est.energyKwh.toFixed(3)} kWh
+                                </strong>
+                              </div>
+                              <div>
+                                Koszt:{' '}
+                                <strong>{est.cost.toFixed(2)} zł</strong>
+                              </div>
+                              {est.ratePerKwh != null && (
+                                <div>
+                                  Stawka:{' '}
+                                  <strong>
+                                    {est.ratePerKwh.toFixed(2)} zł/kWh
+                                  </strong>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -866,48 +949,6 @@ function CostCalculator() {
               })}
             </div>
           )}
-
-          {/* Raport ADDITIONAL */}
-          <div className="mt-4">
-            <h5 className="mb-3">Raport (urządzenia dodane ręcznie)</h5>
-            {additionalResults.length === 0 ? (
-              <p className="text-muted">
-                Brak wyników. Ustaw parametry estymacji powyżej i użyj
-                przycisków „Oszacuj koszt…”.
-              </p>
-            ) : (
-              <div className="table-responsive">
-                <table className="table table-striped align-middle">
-                  <thead>
-                    <tr>
-                      <th>Urządzenie</th>
-                      <th>Moc [W]</th>
-                      <th>Energia [kWh]</th>
-                      <th>Koszt</th>
-                      <th>Tryb</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {additionalResults.map((r) => (
-                      <tr key={r.deviceId}>
-                        <td>{r.name}</td>
-                        <td>
-                          {r.ratedPowerW != null ? r.ratedPowerW : '-'}
-                        </td>
-                        <td>
-                          {r.energyKwh != null ? r.energyKwh.toFixed(3) : '-'}
-                        </td>
-                        <td>
-                          {r.cost != null ? r.cost.toFixed(2) + ' zł' : '-'}
-                        </td>
-                        <td>{r.mode || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
         </section>
       </div>
     </div>

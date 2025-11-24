@@ -1,6 +1,6 @@
-// frontend/src/components/DeviceDashboard.jsx
+// src/components/DeviceDashboard.jsx
 import React, { useEffect, useState } from 'react';
-import { fetchAllDevices, fetchAdditionalDevice } from '../api/deviceApi';
+import { fetchAllDevices } from '../api/deviceApi';
 
 function DeviceDashboard() {
   const [tuyaDevices, setTuyaDevices] = useState([]);
@@ -8,68 +8,319 @@ function DeviceDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [showDetails, setShowDetails] = useState(false);
-  const [detailsLoading, setDetailsLoading] = useState(false);
-  const [detailsError, setDetailsError] = useState(null);
-  const [selectedDevice, setSelectedDevice] = useState(null);
-  const [detailsData, setDetailsData] = useState(null);
+  // 🆕 zamiast jednego ID – lista kluczy, które są rozwinięte
+  // klucze mają postać: 'TUYA-<id>' lub 'ADDITIONAL-<id>'
+  const [expandedKeys, setExpandedKeys] = useState([]);
+
+  // drag & drop
+  const [dragState, setDragState] = useState(null); // { section: 'TUYA' | 'ADDITIONAL', index: number }
 
   useEffect(() => {
-    async function loadDevices() {
+    const load = async () => {
       try {
         setLoading(true);
         setError(null);
-        const devices = await fetchAllDevices();
 
-        const tuya = devices.filter((d) => d.source === 'TUYA');
-        const additional = devices.filter((d) => d.source === 'ADDITIONAL');
+        const data = await fetchAllDevices();
 
-        setTuyaDevices(tuya);
-        setAdditionalDevices(additional);
+        const tuya = data.filter((d) => d.source === 'TUYA');
+        const additional = data.filter((d) => d.source === 'ADDITIONAL');
+
+        // odtwórz kolejność z localStorage
+        const tuyaOrder = JSON.parse(
+          localStorage.getItem('dashboardTuyaOrder') || '[]'
+        );
+        const additionalOrder = JSON.parse(
+          localStorage.getItem('dashboardAdditionalOrder') || '[]'
+        );
+
+        const sortByOrder = (arr, order) => {
+          if (!order || order.length === 0) return arr;
+          return [...arr].sort((a, b) => {
+            const ia = order.indexOf(a.id);
+            const ib = order.indexOf(b.id);
+            if (ia === -1 && ib === -1) return 0;
+            if (ia === -1) return 1;
+            if (ib === -1) return -1;
+            return ia - ib;
+          });
+        };
+
+        setTuyaDevices(sortByOrder(tuya, tuyaOrder));
+        setAdditionalDevices(sortByOrder(additional, additionalOrder));
       } catch (e) {
         console.error(e);
         setError('Nie udało się pobrać listy urządzeń.');
       } finally {
         setLoading(false);
       }
-    }
+    };
 
-    loadDevices();
+    load();
   }, []);
 
-  const openDetails = async (device) => {
-    setSelectedDevice(device);
-    setDetailsData(null);
-    setDetailsError(null);
-    setShowDetails(true);
-
-    if (device.source === 'ADDITIONAL') {
-      try {
-        setDetailsLoading(true);
-        const data = await fetchAdditionalDevice(device.id);
-        setDetailsData(data);
-      } catch (e) {
-        console.error(e);
-        setDetailsError('Nie udało się pobrać szczegółów urządzenia.');
-      } finally {
-        setDetailsLoading(false);
-      }
-    } else {
-      setDetailsLoading(false);
-      setDetailsData(null);
-    }
+  // 🆕 toggle dla wielu rozwiniętych kafelków
+  const toggleExpanded = (source, id) => {
+    const key = `${source}-${id}`;
+    setExpandedKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
   };
 
-  const closeDetails = () => {
-    setShowDetails(false);
-    setSelectedDevice(null);
-    setDetailsData(null);
-    setDetailsError(null);
+  // --- DRAG & DROP ---
+
+  const handleDragStart = (section, index) => {
+    setDragState({ section, index });
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (section, dropIndex) => {
+    if (!dragState || dragState.section !== section) return;
+
+    if (section === 'TUYA') {
+      setTuyaDevices((prev) => {
+        const arr = [...prev];
+        const draggedItem = arr[dragState.index];
+        arr.splice(dragState.index, 1);
+        arr.splice(dropIndex, 0, draggedItem);
+        localStorage.setItem(
+          'dashboardTuyaOrder',
+          JSON.stringify(arr.map((d) => d.id))
+        );
+        return arr;
+      });
+    } else if (section === 'ADDITIONAL') {
+      setAdditionalDevices((prev) => {
+        const arr = [...prev];
+        const draggedItem = arr[dragState.index];
+        arr.splice(dragState.index, 1);
+        arr.splice(dropIndex, 0, draggedItem);
+        localStorage.setItem(
+          'dashboardAdditionalOrder',
+          JSON.stringify(arr.map((d) => d.id))
+        );
+        return arr;
+      });
+    }
+
+    setDragState(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragState(null);
+  };
+
+  const renderTuyaCard = (device, index) => {
+    const key = `TUYA-${device.id}`;
+    const isExpanded = expandedKeys.includes(key);
+    const isDragging =
+      dragState && dragState.section === 'TUYA' && dragState.index === index;
+
+    let categoryLabel = 'Urządzenie';
+    if (device.category === 'cz') categoryLabel = 'Gniazdko';
+    else if (device.category === 'qt') categoryLabel = 'Czujnik';
+    else if (device.category === 'dj') categoryLabel = 'Oświetlenie';
+
+    return (
+      <div
+        key={device.id}
+        className="col-12 col-sm-6 col-md-4 col-lg-3"
+        onDragOver={handleDragOver}
+        onDrop={() => handleDrop('TUYA', index)}
+      >
+        <div
+          className={
+            'card shadow-sm h-100 card-hover card-draggable ' +
+            (isDragging ? 'card-dragging' : '')
+          }
+          draggable
+          onDragStart={() => handleDragStart('TUYA', index)}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="card-header d-flex justify-content-between align-items-center bg-gradient-primary text-white py-2">
+            <div className="d-flex align-items-center gap-2">
+              <span
+                className="drag-handle"
+                title="Przeciągnij, aby zmienić kolejność"
+              >
+                ☰
+              </span>
+              <div>
+                <div className="fw-semibold text-truncate">
+                  {device.name || 'Bez nazwy'}
+                </div>
+                <small className="opacity-75">
+                  {categoryLabel} ({device.category || '-'})
+                </small>
+              </div>
+            </div>
+            <span
+              className={
+                'badge ' + (device.online ? 'bg-success' : 'bg-secondary')
+              }
+            >
+              {device.online ? 'Online' : 'Offline'}
+            </span>
+          </div>
+          <div className="card-body d-flex flex-column">
+            <p className="text-muted small mb-2">
+              Źródło: <span className="fw-semibold">Tuya</span>
+            </p>
+
+            {device.ratedPowerW != null && (
+              <p className="text-muted small mb-1">
+                Moc znamionowa:{' '}
+                <span className="fw-semibold">
+                  {device.ratedPowerW.toFixed(1)} W
+                </span>
+              </p>
+            )}
+
+            {device.description && (
+              <p className="text-muted small mb-1">
+                Opis: <span className="fw-semibold">{device.description}</span>
+              </p>
+            )}
+
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-primary mt-auto"
+              onClick={() => toggleExpanded('TUYA', device.id)}
+            >
+              {isExpanded ? 'Ukryj szczegóły' : 'Pokaż szczegóły'}
+            </button>
+
+            {isExpanded && (
+              <div className="mt-3 border-top pt-2 small text-muted">
+                <div>
+                  <span className="fw-semibold">Model:</span>{' '}
+                  {device.model || '—'}
+                </div>
+                <div>
+                  <span className="fw-semibold">IP:</span>{' '}
+                  {device.ip || '—'}
+                </div>
+                <div>
+                  <span className="fw-semibold">Ostatnia aktualizacja:</span>{' '}
+                  {device.lastUpdate
+                    ? new Date(device.lastUpdate).toLocaleString('pl-PL')
+                    : '—'}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAdditionalCard = (device, index) => {
+    const key = `ADDITIONAL-${device.id}`;
+    const isExpanded = expandedKeys.includes(key);
+    const isDragging =
+      dragState &&
+      dragState.section === 'ADDITIONAL' &&
+      dragState.index === index;
+
+    // 🆕 obsłuż różne nazwy pól z backendu: createdAt / created_at
+    const created =
+      device.createdAt ||
+      device.created_at ||
+      device.created ||
+      null;
+    const updated =
+      device.updatedAt ||
+      device.updated_at ||
+      device.updated ||
+      null;
+
+    return (
+      <div
+        key={device.id}
+        className="col-12 col-sm-6 col-md-4 col-lg-3"
+        onDragOver={handleDragOver}
+        onDrop={() => handleDrop('ADDITIONAL', index)}
+      >
+        <div
+          className={
+            'card shadow-sm h-100 card-hover card-draggable ' +
+            (isDragging ? 'card-dragging' : '')
+          }
+          draggable
+          onDragStart={() => handleDragStart('ADDITIONAL', index)}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="card-header d-flex justify-content-between align-items-center bg-gradient-secondary text-white py-2">
+            <div className="d-flex align-items-center gap-2">
+              <span
+                className="drag-handle"
+                title="Przeciągnij, aby zmienić kolejność"
+              >
+                ☰
+              </span>
+              <div>
+                <div className="fw-semibold text-truncate">
+                  {device.name || 'Bez nazwy'}
+                </div>
+                <small className="opacity-75">
+                  Kategoria: {device.category || '-'}
+                </small>
+              </div>
+            </div>
+            <span className="badge bg-info text-dark">ADDITIONAL</span>
+          </div>
+          <div className="card-body d-flex flex-column">
+            {device.ratedPowerW != null && (
+              <p className="text-muted small mb-1">
+                Moc znamionowa:{' '}
+                <span className="fw-semibold">
+                  {device.ratedPowerW.toFixed(1)} W
+                </span>
+              </p>
+            )}
+
+            {device.description && (
+              <p className="text-muted small mb-2">
+                {device.description}
+              </p>
+            )}
+
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-primary mt-auto"
+              onClick={() => toggleExpanded('ADDITIONAL', device.id)}
+            >
+              {isExpanded ? 'Ukryj szczegóły' : 'Pokaż szczegóły'}
+            </button>
+
+            {isExpanded && (
+              <div className="mt-3 border-top pt-2 small text-muted">
+                <div>
+                  <span className="fw-semibold">Dodano:</span>{' '}
+                  {created
+                    ? new Date(created).toLocaleString('pl-PL')
+                    : '—'}
+                </div>
+                <div>
+                  <span className="fw-semibold">Ostatnia modyfikacja:</span>{' '}
+                  {updated
+                    ? new Date(updated).toLocaleString('pl-PL')
+                    : '—'}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
     return (
-      <div className="d-flex justify-content-center align-items-center vh-100 bg-light">
+      <div className="bg-light min-vh-100 d-flex justify-content-center align-items-center">
         <div className="spinner-border text-primary" role="status">
           <span className="visually-hidden">Wczytywanie...</span>
         </div>
@@ -79,278 +330,66 @@ function DeviceDashboard() {
 
   if (error) {
     return (
-      <div className="container py-5">
-        <div className="alert alert-danger" role="alert">
-          {error}
+      <div className="bg-light min-vh-100">
+        <div className="pb-5 pt-3 px-3 px-md-4 px-lg-5">
+          <div className="alert alert-danger mt-3">{error}</div>
         </div>
       </div>
     );
   }
 
-  const renderDeviceCard = (device) => {
-    const isOnline = device.source === 'TUYA' ? device.online === true : null;
-    const hasPower = device.ratedPowerW != null;
-
-    return (
-      <div
-        key={`${device.source}-${device.id}`}
-        className="col-12 col-md-6 col-lg-4 mb-3"
-      >
-        <div className="card shadow-sm h-100 border-0">
-          <div className="card-body d-flex flex-column">
-            <div className="d-flex justify-content-between align-items-start mb-2">
-              <h5 className="card-title mb-0">
-                {device.name || 'Bez nazwy'}
-              </h5>
-              <span
-                className={`badge ${
-                  device.source === 'TUYA' ? 'bg-primary' : 'bg-secondary'
-                }`}
-              >
-                {device.source === 'TUYA' ? 'Tuya' : 'Manual'}
-              </span>
-            </div>
-
-            <p className="card-text text-muted small mb-2">
-              Kategoria: <strong>{device.category || 'brak'}</strong>
-            </p>
-
-            {device.description && (
-              <p className="card-text small mb-2">{device.description}</p>
-            )}
-
-            {hasPower && (
-              <p className="card-text small mb-2">
-                <span className="text-muted">Moc znamionowa:&nbsp;</span>
-                <strong>{device.ratedPowerW} W</strong>
-              </p>
-            )}
-
-            {device.source === 'TUYA' && (
-              <p className="card-text small mb-2">
-                Status:&nbsp;
-                <span
-                  className={`badge ${
-                    isOnline ? 'bg-success' : 'bg-danger'
-                  }`}
-                >
-                  {isOnline ? 'Online' : 'Offline'}
-                </span>
-              </p>
-            )}
-
-            <div className="mt-auto d-flex justify-content-end">
-              <button
-                type="button"
-                className="btn btn-sm btn-outline-primary"
-                onClick={() => openDetails(device)}
-              >
-                Szczegóły
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderDetailsModal = () => {
-    if (!showDetails || !selectedDevice) return null;
-
-    const src = selectedDevice.source;
-    const base = selectedDevice;
-    const extra = detailsData;
-
-    const name =
-      (src === 'ADDITIONAL' && extra && extra.name) || base.name || 'Bez nazwy';
-    const category =
-      (src === 'ADDITIONAL' && extra && extra.category) || base.category;
-    const ratedPowerW =
-      (src === 'ADDITIONAL' && extra && extra.ratedPowerW) || base.ratedPowerW;
-    const description =
-      (src === 'ADDITIONAL' && extra && extra.description) || base.description;
-
-    const isOnline = src === 'TUYA' ? base.online === true : null;
-
-    const model = src === 'TUYA' ? base.model : null;
-    const ip = src === 'TUYA' ? base.ip : null;
-    const lastUpdate = src === 'TUYA' ? base.lastUpdate : null;
-
-    const createdAt =
-      src === 'ADDITIONAL' && extra && extra.createdAt ? extra.createdAt : null;
-    const updatedAt =
-      src === 'ADDITIONAL' && extra && extra.updatedAt ? extra.updatedAt : null;
-
-    return (
-      <div
-        className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-        style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}
-      >
-        <div className="card shadow-lg" style={{ maxWidth: '520px', width: '100%' }}>
-          <div className="card-header d-flex justify-content-between align-items-center">
-            <h5 className="mb-0">Szczegóły urządzenia</h5>
-            <button
-              type="button"
-              className="btn-close"
-              aria-label="Close"
-              onClick={closeDetails}
-            />
-          </div>
-          <div className="card-body">
-            {detailsLoading && src === 'ADDITIONAL' && (
-              <div className="d-flex align-items-center mb-3">
-                <div className="spinner-border spinner-border-sm text-primary me-2" />
-                <span className="small text-muted">Wczytywanie szczegółów...</span>
-              </div>
-            )}
-
-            {detailsError && (
-              <div className="alert alert-warning py-2 small">
-                {detailsError}
-              </div>
-            )}
-
-            <p className="mb-1">
-              <span className="text-muted">Nazwa:&nbsp;</span>
-              <strong>{name}</strong>
-            </p>
-
-            <p className="mb-1">
-              <span className="text-muted">Źródło:&nbsp;</span>
-              <strong>
-                {src === 'TUYA' ? 'Tuya' : 'Urządzenie dodane ręcznie'}
-              </strong>
-            </p>
-
-            <p className="mb-1">
-              <span className="text-muted">Kategoria:&nbsp;</span>
-              <strong>{category || 'brak'}</strong>
-            </p>
-
-            {ratedPowerW != null && (
-              <p className="mb-1">
-                <span className="text-muted">Moc znamionowa:&nbsp;</span>
-                <strong>{ratedPowerW} W</strong>
-              </p>
-            )}
-
-            {src === 'TUYA' && (
-              <p className="mb-1">
-                <span className="text-muted">Status:&nbsp;</span>
-                <span
-                  className={`badge ${
-                    isOnline ? 'bg-success' : 'bg-danger'
-                  }`}
-                >
-                  {isOnline ? 'Online' : 'Offline'}
-                </span>
-              </p>
-            )}
-
-            {src === 'TUYA' && model && (
-              <p className="mb-1">
-                <span className="text-muted">Model:&nbsp;</span>
-                <strong>{model}</strong>
-              </p>
-            )}
-
-            {src === 'TUYA' && ip && (
-              <p className="mb-1">
-                <span className="text-muted">IP:&nbsp;</span>
-                <strong>{ip}</strong>
-              </p>
-            )}
-
-            {src === 'TUYA' && lastUpdate && (
-              <p className="mb-1">
-                <span className="text-muted">Ostatnia aktualizacja:&nbsp;</span>
-                <span>{new Date(lastUpdate).toLocaleString()}</span>
-              </p>
-            )}
-
-            {src === 'ADDITIONAL' && createdAt && (
-              <p className="mb-1">
-                <span className="text-muted">Utworzono:&nbsp;</span>
-                <span>{new Date(createdAt).toLocaleString()}</span>
-              </p>
-            )}
-
-            {src === 'ADDITIONAL' && updatedAt && (
-              <p className="mb-1">
-                <span className="text-muted">Ostatnia zmiana:&nbsp;</span>
-                <span>{new Date(updatedAt).toLocaleString()}</span>
-              </p>
-            )}
-
-            {description && (
-              <p className="mt-2">
-                <span className="text-muted">Opis:&nbsp;</span>
-                {description}
-              </p>
-            )}
-          </div>
-          <div className="card-footer d-flex justify-content-end">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={closeDetails}
-            >
-              Zamknij
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="bg-light min-vh-100">
-      <div className="container-fluid pb-5 pt-3">
-        <div className="row mb-4">
-          <div className="col">
+      <div className="pb-5 pt-3 px-3 px-md-4 px-lg-5">
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+          <div>
             <h2 className="mb-1">Dashboard urządzeń</h2>
             <p className="text-muted mb-0">
-              Podgląd urządzeń Tuya oraz urządzeń dodanych ręcznie.
+              Przeciągaj kafelki, aby ustawić własną kolejność. Dane są
+              pobierane z Tuya oraz z ręcznie dodanych urządzeń.
             </p>
           </div>
         </div>
 
+        {/* TUYA */}
         <section className="mb-5">
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h4 className="mb-0">Urządzenia Tuya</h4>
-            <span className="badge bg-primary">
+            <span className="badge bg-dark-subtle text-dark">
               {tuyaDevices.length} urządzeń
             </span>
           </div>
-
           {tuyaDevices.length === 0 ? (
-            <div className="alert alert-info">
-              Brak zsynchronizowanych urządzeń Tuya.
-            </div>
+            <p className="text-muted">Brak urządzeń Tuya.</p>
           ) : (
-            <div className="row">{tuyaDevices.map(renderDeviceCard)}</div>
+            <div className="row g-3">
+              {tuyaDevices.map((d, index) => renderTuyaCard(d, index))}
+            </div>
           )}
         </section>
 
+        {/* ADDITIONAL */}
         <section>
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h4 className="mb-0">Urządzenia dodatkowe</h4>
-            <span className="badge bg-secondary">
+            <h4 className="mb-0">Urządzenia dodane ręcznie</h4>
+            <span className="badge bg-dark-subtle text-dark">
               {additionalDevices.length} urządzeń
             </span>
           </div>
-
           {additionalDevices.length === 0 ? (
-            <div className="alert alert-info">
-              Nie dodano jeszcze żadnych urządzeń ręcznych.
-            </div>
+            <p className="text-muted">
+              Brak urządzeń dodanych ręcznie. Możesz dodać je w sekcji „Zarządzaj
+              dodanymi urządzeniami”.
+            </p>
           ) : (
-            <div className="row">{additionalDevices.map(renderDeviceCard)}</div>
+            <div className="row g-3">
+              {additionalDevices.map((d, index) =>
+                renderAdditionalCard(d, index)
+              )}
+            </div>
           )}
         </section>
       </div>
-
-      {renderDetailsModal()}
     </div>
   );
 }

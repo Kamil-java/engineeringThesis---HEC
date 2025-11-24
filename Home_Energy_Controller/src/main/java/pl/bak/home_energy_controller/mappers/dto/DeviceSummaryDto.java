@@ -20,6 +20,8 @@ public class DeviceSummaryDto {
     private String model;
     private String ip;
     private Instant lastUpdate;
+    private Instant createdAt;
+    private Instant updatedAt;
 
 
     /**
@@ -120,5 +122,21 @@ public class DeviceSummaryDto {
 
     public void setLastUpdate(Instant lastUpdate) {
         this.lastUpdate = lastUpdate;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }
