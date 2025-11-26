@@ -1,4 +1,3 @@
-// src/components/CostCalculator.jsx
 import React, { useEffect, useState } from 'react';
 import {
   fetchAllDevices,
@@ -10,27 +9,20 @@ import {
 function CostCalculator() {
   const [tuyaDevices, setTuyaDevices] = useState([]);
   const [additionalDevices, setAdditionalDevices] = useState([]);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [infoMessage, setInfoMessage] = useState(null);
-
   const [tuyaEstimates, setTuyaEstimates] = useState({});
   const [additionalEstimates, setAdditionalEstimates] = useState({});
-
   const [selectedTuyaIds, setSelectedTuyaIds] = useState([]);
   const [selectedAdditionalIds, setSelectedAdditionalIds] = useState([]);
-
-  // edycja Tuya
   const [editingBulbDeviceId, setEditingBulbDeviceId] = useState(null);
   const [bulbForm, setBulbForm] = useState({
     bulbDescription: '',
     ratedPowerW: '',
   });
   const [savingBulb, setSavingBulb] = useState(false);
-
-  // drag & drop
-  const [dragState, setDragState] = useState(null); // { section: 'TUYA' | 'ADDITIONAL', index: number }
+  const [dragState, setDragState] = useState(null);
 
   const loadDevices = async () => {
     try {
@@ -43,7 +35,6 @@ function CostCalculator() {
       const tuya = data.filter((d) => d.source === 'TUYA');
       const additional = data.filter((d) => d.source === 'ADDITIONAL');
 
-      // odtwórz kolejność z localStorage
       const tuyaOrder = JSON.parse(
         localStorage.getItem('estimationTuyaOrder') || '[]'
       );
@@ -69,7 +60,6 @@ function CostCalculator() {
       setTuyaDevices(tuyaSorted);
       setAdditionalDevices(additionalSorted);
 
-      // domyślne estymacje
       const tuyaDefaults = {};
       tuyaSorted.forEach((d) => {
         tuyaDefaults[d.id] = {
@@ -111,8 +101,6 @@ function CostCalculator() {
     loadDevices();
   }, []);
 
-  // ----- zaznaczanie -----
-
   const toggleSelectTuya = (id) => {
     setSelectedTuyaIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -124,8 +112,6 @@ function CostCalculator() {
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
-
-  // ----- edycja Tuya -----
 
   const startEditBulb = (device) => {
     setEditingBulbDeviceId(device.id);
@@ -194,8 +180,6 @@ function CostCalculator() {
     }
   };
 
-  // ----- estymacja TUYA -----
-
   const handleTuyaHoursChange = (deviceId, value) => {
     setTuyaEstimates((prev) => ({
       ...prev,
@@ -240,8 +224,6 @@ function CostCalculator() {
       setError('Nie udało się obliczyć estymacji dla urządzenia Tuya.');
     }
   };
-
-  // ----- estymacja ADDITIONAL -----
 
   const handleAdditionalModeChange = (deviceId, mode) => {
     setAdditionalEstimates((prev) => ({
@@ -317,20 +299,16 @@ function CostCalculator() {
     }
   };
 
-  // ----- estymacja zbiorcza -----
-
   const estimateSelected = async () => {
     try {
       setError(null);
       setInfoMessage(null);
 
       for (const id of selectedTuyaIds) {
-        // eslint-disable-next-line no-await-in-loop
         await estimateTuyaSingle(id);
       }
 
       for (const id of selectedAdditionalIds) {
-        // eslint-disable-next-line no-await-in-loop
         await estimateAdditionalSingle(id);
       }
 
@@ -347,12 +325,10 @@ function CostCalculator() {
       setInfoMessage(null);
 
       for (const d of tuyaDevices) {
-        // eslint-disable-next-line no-await-in-loop
         await estimateTuyaSingle(d.id);
       }
 
       for (const d of additionalDevices) {
-        // eslint-disable-next-line no-await-in-loop
         await estimateAdditionalSingle(d.id);
       }
 
@@ -364,7 +340,6 @@ function CostCalculator() {
   };
 
   // ----- DRAG & DROP -----
-
   const handleDragStart = (section, index) => {
     setDragState({ section, index });
   };
@@ -408,8 +383,6 @@ function CostCalculator() {
   const handleDragEnd = () => {
     setDragState(null);
   };
-
-  // ----- render -----
 
   if (loading) {
     return (
@@ -475,7 +448,6 @@ function CostCalculator() {
           {selectedAdditionalIds.length}
         </div>
 
-        {/* --- TUYA --- */}
         <section className="mb-5">
           <h4 className="mb-3">Urządzenia Tuya</h4>
           {tuyaDevices.length === 0 ? (
@@ -712,7 +684,6 @@ function CostCalculator() {
           )}
         </section>
 
-        {/* --- ADDITIONAL --- */}
         <section>
           <h4 className="mb-3">Urządzenia dodane ręcznie</h4>
           {additionalDevices.length === 0 ? (

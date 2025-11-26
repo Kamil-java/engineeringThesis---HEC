@@ -1,4 +1,3 @@
-// src/components/EnergyHistory.jsx
 import React, { useEffect, useState } from 'react';
 import {
   fetchAllDevices,
@@ -9,20 +8,15 @@ import {
 } from '../api/deviceApi';
 
 function EnergyHistory() {
-  const [devices, setDevices] = useState([]); // tylko TUYA
-  const [deviceStats, setDeviceStats] = useState([]); // { deviceId, name, category, energyKwh, cost, avgPowerW }
-
-  const [viewMode, setViewMode] = useState('MONTH'); // 'MONTH' | 'DAY' | 'HOUR'
+  const [devices, setDevices] = useState([]);
+  const [deviceStats, setDeviceStats] = useState([]);
+  const [viewMode, setViewMode] = useState('MONTH');
   const [periodLabel, setPeriodLabel] = useState('');
-
   const [totalCost, setTotalCost] = useState(0);
   const [perCategory, setPerCategory] = useState({});
-
-  const [lightingStats, setLightingStats] = useState([]); // [{ deviceId, name, ratedPowerW, energyKwh, cost }]
-
+  const [lightingStats, setLightingStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
   const viewModeLabel =
     viewMode === 'MONTH'
       ? 'Miesięcznie'
@@ -36,12 +30,10 @@ function EnergyHistory() {
         setLoading(true);
         setError(null);
 
-        // 1. Pobierz wszystkie urządzenia i filtruj tylko TUYA
         const all = await fetchAllDevices();
         const tuyaDevices = all.filter((d) => d.source === 'TUYA');
         setDevices(tuyaDevices);
 
-        // 2. Ustal label okresu
         const now = new Date();
         if (viewMode === 'MONTH') {
           setPeriodLabel(
@@ -59,7 +51,6 @@ function EnergyHistory() {
           setPeriodLabel('Ostatnia godzina');
         }
 
-        // 3. Pobierz koszty dla każdego urządzenia (podstawowe)
         const perDevicePromises = tuyaDevices.map(async (d) => {
           try {
             let data;
@@ -95,7 +86,6 @@ function EnergyHistory() {
         let finalStats = baseStats;
         let lighting = [];
 
-        // 4. Dla widoku "MIESIĄC" – scal z danymi oświetlenia
         if (viewMode === 'MONTH') {
           const lightingDevices = tuyaDevices.filter(
             (d) => d.category === 'dj'
@@ -125,13 +115,11 @@ function EnergyHistory() {
           );
           setLightingStats(lighting);
 
-          // mapa: deviceId -> lighting entry
           const lightingById = {};
           lighting.forEach((l) => {
             lightingById[l.deviceId] = l;
           });
 
-          // nadpisz statystyki dla urządzeń 'dj' danymi z lighting
           finalStats = baseStats.map((s) => {
             const l = lightingById[s.deviceId];
             if (l) {
@@ -144,8 +132,6 @@ function EnergyHistory() {
             return s;
           });
 
-          // jeśli z jakiegoś powodu w baseStats nie ma lampy,
-          // a jest w lighting – dodaj jako nowy wpis
           lighting.forEach((l) => {
             const exists = finalStats.some((s) => s.deviceId === l.deviceId);
             if (!exists) {
@@ -161,11 +147,8 @@ function EnergyHistory() {
             }
           });
         } else {
-          // dla DAY/HOUR nie używamy lightingowego endpointu
           setLightingStats([]);
         }
-
-        // 5. Agregacja: suma i koszt per kategoria na podstawie finalStats
         let total = 0;
         const perCat = {};
         for (const s of finalStats) {
@@ -232,7 +215,6 @@ function EnergyHistory() {
   return (
     <div className="bg-light min-vh-100">
       <div className="pb-5 pt-3 px-3 px-md-4 px-lg-5">
-        {/* Nagłówek */}
         <div className="row mb-4 align-items-center">
           <div className="col-12 col-md-7">
             <h2 className="mb-1">Historia kosztów energii</h2>
@@ -281,7 +263,6 @@ function EnergyHistory() {
           </div>
         </div>
 
-        {/* Karty podsumowania */}
         <div className="row g-3 mb-4">
           <div className="col-12 col-md-4">
             <div className="card shadow-sm h-100 bg-gradient-primary text-white border-0">
@@ -342,9 +323,7 @@ function EnergyHistory() {
           </div>
         </div>
 
-        {/* Koszt per kategoria + top urządzenia */}
         <div className="row g-4 mb-4">
-          {/* Koszt per kategoria */}
           <div className="col-12 col-lg-6">
             <div className="card shadow-sm h-100">
               <div className="card-body">
@@ -398,7 +377,6 @@ function EnergyHistory() {
             </div>
           </div>
 
-          {/* Top urządzenia */}
           <div className="col-12 col-lg-6">
             <div className="card shadow-sm h-100">
               <div className="card-body d-flex flex-column">
@@ -452,7 +430,6 @@ function EnergyHistory() {
           </div>
         </div>
 
-        {/* Oświetlenie – tylko dla widoku miesięcznego */}
         {viewMode === 'MONTH' && (
           <div className="row mb-4">
             <div className="col-12">
@@ -511,7 +488,6 @@ function EnergyHistory() {
           </div>
         )}
 
-        {/* Szczegółowa tabela urządzeń */}
         <div className="row">
           <div className="col-12">
             <div className="card shadow-sm">

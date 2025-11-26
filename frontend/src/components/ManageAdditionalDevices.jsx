@@ -1,4 +1,3 @@
-// src/components/ManageAdditionalDevices.jsx
 import React, { useEffect, useState } from 'react';
 import {
   fetchAdditionalDevices,

@@ -1,4 +1,3 @@
-// src/components/DeviceDashboard.jsx
 import React, { useEffect, useState } from 'react';
 import { fetchAllDevices } from '../api/deviceApi';
 
@@ -7,13 +6,8 @@ function DeviceDashboard() {
   const [additionalDevices, setAdditionalDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // 🆕 zamiast jednego ID – lista kluczy, które są rozwinięte
-  // klucze mają postać: 'TUYA-<id>' lub 'ADDITIONAL-<id>'
   const [expandedKeys, setExpandedKeys] = useState([]);
-
-  // drag & drop
-  const [dragState, setDragState] = useState(null); // { section: 'TUYA' | 'ADDITIONAL', index: number }
+  const [dragState, setDragState] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -25,8 +19,6 @@ function DeviceDashboard() {
 
         const tuya = data.filter((d) => d.source === 'TUYA');
         const additional = data.filter((d) => d.source === 'ADDITIONAL');
-
-        // odtwórz kolejność z localStorage
         const tuyaOrder = JSON.parse(
           localStorage.getItem('dashboardTuyaOrder') || '[]'
         );
@@ -59,15 +51,12 @@ function DeviceDashboard() {
     load();
   }, []);
 
-  // 🆕 toggle dla wielu rozwiniętych kafelków
   const toggleExpanded = (source, id) => {
     const key = `${source}-${id}`;
     setExpandedKeys((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
     );
   };
-
-  // --- DRAG & DROP ---
 
   const handleDragStart = (section, index) => {
     setDragState({ section, index });
@@ -224,8 +213,6 @@ function DeviceDashboard() {
       dragState &&
       dragState.section === 'ADDITIONAL' &&
       dragState.index === index;
-
-    // 🆕 obsłuż różne nazwy pól z backendu: createdAt / created_at
     const created =
       device.createdAt ||
       device.created_at ||
@@ -351,7 +338,6 @@ function DeviceDashboard() {
           </div>
         </div>
 
-        {/* TUYA */}
         <section className="mb-5">
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h4 className="mb-0">Urządzenia Tuya</h4>
@@ -368,7 +354,6 @@ function DeviceDashboard() {
           )}
         </section>
 
-        {/* ADDITIONAL */}
         <section>
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h4 className="mb-0">Urządzenia dodane ręcznie</h4>
