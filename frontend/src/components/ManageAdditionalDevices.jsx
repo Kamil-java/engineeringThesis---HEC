@@ -197,9 +197,6 @@ function ManageAdditionalDevices() {
                   <h5 className="card-title mb-0">
                     Dodane urządzenia ({devices.length})
                   </h5>
-                  <span className="badge bg-dark-subtle text-dark">
-                    CRUD: edytuj, usuń, przeglądaj
-                  </span>
                 </div>
 
                 {devices.length === 0 ? (
@@ -260,7 +257,7 @@ function ManageAdditionalDevices() {
                                   onClick={() => handleEdit(d)}
                                   disabled={deletingId === d.id}
                                 >
-                                  ✏️ Edytuj
+                                  Edytuj
                                 </button>
                                 <button
                                   type="button"
@@ -268,7 +265,7 @@ function ManageAdditionalDevices() {
                                   onClick={() => handleDelete(d.id)}
                                   disabled={deletingId === d.id}
                                 >
-                                  {deletingId === d.id ? 'Usuwanie…' : '🗑 Usuń'}
+                                  {deletingId === d.id ? 'Usuwanie…' : 'Usuń'}
                                 </button>
                               </div>
                             </td>
